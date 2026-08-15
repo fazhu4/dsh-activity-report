@@ -9,6 +9,7 @@ import type {
   SessionRecord,
 } from './contract.ts'
 import type { ActivityRuntimeStatus } from './host.ts'
+import { dayKey } from './fold.ts'
 import { queryBreakdown, querySummary } from './query.ts'
 import { totalTokens } from './metrics.ts'
 
@@ -222,7 +223,7 @@ function handler(
         case 'export': {
           const query = breakdownQuery(params, source, config)
           const body = csvRows(query.dimension, await allBreakdownRows(records, query))
-          const date = new Date(source.now()).toISOString().slice(0, 10)
+          const date = dayKey(source.now(), source.timezone())
           res.writeHead(200, {
             'Content-Type': 'text/csv; charset=utf-8',
             'Content-Disposition': `attachment; filename="dsh-activity-${query.dimension}-${date}.csv"`,

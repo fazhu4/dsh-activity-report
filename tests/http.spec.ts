@@ -20,7 +20,7 @@ function source(): ActivityHttpSource {
     status: () => ({
       phase: 'ready', processedSessions: 1, totalSessions: 1, failedSessions: 0, dirtyCount: 0, lastPersistedAt: 123,
     }),
-    now: () => Date.parse('2026-08-16T12:00:00+08:00'),
+    now: () => Date.parse('2026-08-16T01:00:00+08:00'),
     timezone: () => 'Asia/Shanghai',
   }
 }
@@ -78,6 +78,7 @@ describe('activity report HTTP API', () => {
     const response = await harness().request('/dsh-activity-report/export.csv?range=today&dimension=model')
     expect(response.status).toBe(200)
     expect(response.headers['Content-Type']).toContain('text/csv')
+    expect(response.headers['Content-Disposition']).toContain('dsh-activity-model-2026-08-16.csv')
     expect(response.body).toContain('\uFEFFmodel,requests,input,cache_read,cache_write,output,reasoning,total_tokens')
     expect(response.body).toContain('summary-model,1,20,0,0,5,0,25')
   })
