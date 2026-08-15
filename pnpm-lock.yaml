@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: link:../../deepseek-harness/vendor/cordis
@@ -38,6 +42,9 @@ importers:
       '@deepseek-ai/dsh-session-query-sqlite':
         specifier: link:../../deepseek-harness/packages/session-query/session-query-sqlite
         version: link:../../deepseek-harness/packages/session-query/session-query-sqlite
+      '@deepseek-ai/dsh-storage-domain':
+        specifier: link:../../deepseek-harness/packages/storage/storage-domain
+        version: link:../../deepseek-harness/packages/storage/storage-domain
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
@@ -663,6 +670,9 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@esbuild/aix-ppc64@0.25.0':
@@ -1083,3 +1093,5 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  zod@4.4.3: {}

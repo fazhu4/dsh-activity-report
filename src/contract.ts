@@ -4,6 +4,77 @@
  * both the Node half and the client bundle can import it.
  */
 
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { Metrics, UsageMetrics } from './metrics.ts'
+
+/** Model-call origin shown separately in usage breakdowns. */
+export type RequestOrigin = 'agent' | 'compaction'
+
+/** Provider route attached to one model request. */
+export interface RouteRef {
+  provider: string
+  model: string
+}
+
+/** One natural-day aggregate inside a session record. */
+export interface DayFacts {
+  totals: Metrics
+  byProvider: Record<string, Metrics>
+  byModel: Record<string, Metrics>
+  byTool: Record<string, Metrics>
+  byOrigin: Partial<Record<RequestOrigin, Metrics>>
+}
+
+/** Replaceable provider usage sample for the currently open step. */
+export interface UsageSample {
+  stepKey: string
+  day: string
+  provider: string
+  model: string
+  origin: RequestOrigin
+  usage: UsageMetrics
+}
+
+/** Incremental timing state for an open Agent step. */
+export interface OpenStep {
+  turn: number
+  step: number
+  startTime: number
+  firstTokenTime?: number
+  route?: RouteRef
+}
+
+/** Tool call awaiting its durable result. */
+export interface PendingTool {
+  name: string
+  startTime: number
+}
+
+/** Cross-event state required to continue an incremental fold after restart. */
+export interface RuntimeFoldState {
+  currentRoute?: RouteRef
+  openStep?: OpenStep
+  openUsage?: UsageSample
+  lastCountedTurn: number | null
+  pendingTools: Record<string, PendingTool>
+}
+
+/** Metadata displayed for one local Session. */
+export interface SessionMetadata {
+  cwd?: string
+  title?: string
+  createdAt?: number
+}
+
+/** One atomically persisted per-session fold. */
+export interface SessionRecord {
+  sessionId: SessionId
+  watermark: number
+  metadata: SessionMetadata
+  runtime: RuntimeFoldState
+  days: Record<string, DayFacts>
+}
+
 /** Token accounting for one model call (mirrors the session log's TokenUsage). */
 export interface TokenCounts {
   /** Uncached input tokens. */

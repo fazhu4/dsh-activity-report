@@ -148,7 +148,7 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 
 ### 持久化模型
 
-插件注入 `storageDomain`，打开版本化的 `activity-report` domain。`sessions` 表以品牌化 Session ID 为键，每个值是一个原子会话折叠记录，包含：
+插件注入 `storageDomain`，打开版本化的 `activity_report` domain（storage domain 名称只允许小写字母、数字和下划线）。`sessions` 表以品牌化 Session ID 为键，每个值是一个原子会话折叠记录，包含：
 
 - 会话元数据：工作区、标题、创建时间。
 - 已持久化 watermark。
