@@ -1,0 +1,12 @@
+# dsh-activity-report bundle patch layer — installed automatically when this
+# package is added as a bundle (dsh plugin --profile web add dsh-activity-report).
+- insert:
+    - id: dsh-activity-report
+      name: 'dsh-activity-report'
+      # webServer 提供 HTTP 数据路由；sessionQuery 回填历史；sessions 增量监听
+      inject: ['webServer', 'sessionQuery', 'sessions', 'fs']
+      config:
+        # 固化存储文件名（相对 $DSH_HOME/storages/）
+        storeFile: activity-report.json
+        # 运行中增量落盘 debounce 毫秒
+        saveDebounceMs: 2000
