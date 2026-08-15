@@ -18,13 +18,13 @@ DeepSeek Harness 的本地只读用量面板。它从 DSH 会话事件中统计 
 
 ## 安装
 
-在 DSH Web profile 中添加本地目录：
+在 DSH Web profile 中从 GitHub 添加插件：
 
 ```powershell
-dsh plugin --profile web add link:G:\项目\git\demo\dsh-activity-report
+dsh plugin --profile web add github:fazhu4/dsh-activity-report
 ```
 
-开发 worktree 可使用其实际绝对路径。添加后重启 `dsh web`，再打开“设置 > 工作活动”。GitHub 仓库建立后也可以把仓库地址交给同一条 `dsh plugin add` 命令。
+本地开发时可把参数换成 `link:<插件目录的绝对路径>`。添加后重启 `dsh web`，再打开“设置 > 工作活动”。
 
 ## 指标口径
 
