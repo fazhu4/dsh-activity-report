@@ -2,6 +2,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { ActivityRuntime } from './host.ts'
+import { registerActivityRoutes } from './http.ts'
+import type { WebServerFace } from './http.ts'
 
 /** Cordis plugin name. */
 export const name = 'dsh-activity-report'
@@ -43,7 +45,7 @@ export function resolveConfig(config: Config = {}): ResolvedConfig {
 }
 
 /** Mount replay-safe activity ingestion and storage lifecycle. */
-export async function apply(ctx: Context, config: Config = {}): Promise<void> {
+export async function apply(ctx: Context & { webServer: WebServerFace }, config: Config = {}): Promise<void> {
   const resolved = resolveConfig(config)
   const runtime = new ActivityRuntime({
     storageDomain: ctx.storageDomain,
@@ -58,7 +60,14 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     runtime.acceptLive(session.id, event)
   })
   const offFlush = ctx.on('session/flush', () => runtime.flush())
+  const offRoutes = registerActivityRoutes(ctx.webServer, {
+    records: () => runtime.records(),
+    status: () => runtime.status(),
+    now: () => Date.now(),
+    timezone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }, resolved)
   ctx.effect(() => async () => {
+    offRoutes()
     offEvent()
     offFlush()
     await runtime.dispose()
