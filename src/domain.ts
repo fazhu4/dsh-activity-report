@@ -61,6 +61,7 @@ const sessionRecordSchema = z.object({
       step: count,
       startTime: z.number(),
       firstTokenTime: z.number().optional(),
+      messageRecorded: z.boolean().optional(),
       route: routeSchema.optional(),
     }).strict().optional(),
     openUsage: z.object({

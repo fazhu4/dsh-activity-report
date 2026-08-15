@@ -98,7 +98,7 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 - “全部”从最早可读事件到当前时间。
 - 所有 API 使用明确的 `startDay` 和排他的 `endDay`；服务端返回实际时区和边界。
 - Agent 请求用量归入最终有效 usage 样本发生的日期；最终 message 替换早期 chunk 时允许样本迁移日期。压缩摘要用量归入 `compaction/summary` 日期。
-- 轮次结果归入 `turn/end` 日期，步骤归入 `step/end` 日期，工具调用与耗时归入 `tool/result` 日期。
+- 轮次结果归入 `turn/end` 日期，步骤归入 `step/end` 日期，工具调用数归入 `tool/call` 日期；工具结果、失败与耗时归入对应 `tool/result` 日期。
 - 卡片、趋势和明细必须从同一组日期桶聚合，不能按“会话最后活动时间”筛选整段会话总量。
 
 ## 维度与可展示字段

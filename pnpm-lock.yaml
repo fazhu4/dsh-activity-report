@@ -27,12 +27,18 @@ importers:
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: link:../../deepseek-harness/packages/client/ui-slots
         version: link:../../deepseek-harness/packages/client/ui-slots
+      '@deepseek-ai/dsh-compaction':
+        specifier: link:../../deepseek-harness/packages/compaction/compaction
+        version: link:../../deepseek-harness/packages/compaction/compaction
       '@deepseek-ai/dsh-fs':
         specifier: link:../../deepseek-harness/packages/fs/fs
         version: link:../../deepseek-harness/packages/fs/fs
       '@deepseek-ai/dsh-home-paths':
         specifier: link:../../deepseek-harness/packages/util/home-paths
         version: link:../../deepseek-harness/packages/util/home-paths
+      '@deepseek-ai/dsh-llm':
+        specifier: link:../../deepseek-harness/packages/llm/llm
+        version: link:../../deepseek-harness/packages/llm/llm
       '@deepseek-ai/dsh-session':
         specifier: link:../../deepseek-harness/packages/core/session
         version: link:../../deepseek-harness/packages/core/session

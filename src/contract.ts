@@ -41,6 +41,7 @@ export interface OpenStep {
   step: number
   startTime: number
   firstTokenTime?: number
+  messageRecorded?: boolean
   route?: RouteRef
 }
 
