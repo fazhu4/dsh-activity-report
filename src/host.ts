@@ -1,5 +1,5 @@
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
-import type { SessionRecord } from './contract.ts'
+import type { ActivityDataStatus, SessionRecord } from './contract.ts'
 import { activityReportDomainSpec } from './domain.ts'
 import { createFoldState, foldEvents, hydrateFoldState } from './fold.ts'
 import type { FoldState } from './fold.ts'
@@ -35,14 +35,7 @@ export interface ActivityRuntimeConfig {
 }
 
 /** Observable ingestion and durability state returned by the summary API. */
-export interface ActivityRuntimeStatus {
-  phase: 'backfilling' | 'ready' | 'degraded' | 'disposed'
-  processedSessions: number
-  totalSessions: number
-  failedSessions: number
-  dirtyCount: number
-  lastPersistedAt?: number
-}
+export type ActivityRuntimeStatus = ActivityDataStatus
 
 function metadata(header: SessionHeader, title?: string) {
   return {

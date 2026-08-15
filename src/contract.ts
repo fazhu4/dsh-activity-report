@@ -117,6 +117,30 @@ export interface ActivitySummary {
   activeWorkspaces: number
 }
 
+/** Observable ingestion and durability state returned with summary data. */
+export interface ActivityDataStatus {
+  phase: 'backfilling' | 'ready' | 'degraded' | 'disposed'
+  processedSessions: number
+  totalSessions: number
+  failedSessions: number
+  dirtyCount: number
+  lastPersistedAt?: number
+}
+
+/** Summary response served to the browser. */
+export interface ActivitySummaryResponse extends ActivitySummary {
+  status: ActivityDataStatus
+}
+
+/** Available server-derived filter values and observed day span. */
+export interface ActivityFilterOptions {
+  workspaces: string[]
+  providers: string[]
+  models: string[]
+  startDay?: string
+  endDay?: string
+}
+
 /** Supported analysis-table dimensions. */
 export type BreakdownDimension = 'workspace' | 'provider' | 'model' | 'session' | 'tool'
 
