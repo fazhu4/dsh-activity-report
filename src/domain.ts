@@ -40,6 +40,12 @@ const dayFactsSchema: z.ZodType<DayFacts> = z.object({
   totals: metricsSchema,
   byProvider: z.record(z.string(), metricsSchema),
   byModel: z.record(z.string(), metricsSchema),
+  byRoute: z.record(z.string(), z.object({
+    provider: z.string(),
+    model: z.string(),
+    metrics: metricsSchema,
+    byOrigin: z.object({ agent: metricsSchema.optional(), compaction: metricsSchema.optional() }).strict(),
+  }).strict()),
   byTool: z.record(z.string(), metricsSchema),
   byOrigin: z.object({ agent: metricsSchema.optional(), compaction: metricsSchema.optional() }).strict(),
 }).strict()

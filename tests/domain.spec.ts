@@ -31,6 +31,7 @@ describe('activity report durable domain', () => {
       },
       byProvider: {},
       byModel: {},
+      byRoute: {},
       byTool: {},
       byOrigin: {},
     }

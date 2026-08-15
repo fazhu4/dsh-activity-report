@@ -46,6 +46,7 @@ function emptyDayFacts(): DayFacts {
     totals: emptyMetrics(),
     byProvider: {},
     byModel: {},
+    byRoute: {},
     byTool: {},
     byOrigin: {},
   }
@@ -74,6 +75,9 @@ function removeEmptyDay(record: SessionRecord, dayName: string): void {
   if (day === undefined) return
   removeEmpty(day.byProvider)
   removeEmpty(day.byModel)
+  for (const [key, route] of Object.entries(day.byRoute)) {
+    if (isMetricsEmpty(route.metrics)) delete day.byRoute[key]
+  }
   removeEmpty(day.byTool)
   for (const origin of ['agent', 'compaction'] as const) {
     if (day.byOrigin[origin] !== undefined && isMetricsEmpty(day.byOrigin[origin])) {
@@ -83,6 +87,7 @@ function removeEmptyDay(record: SessionRecord, dayName: string): void {
   if (isMetricsEmpty(day.totals)
     && Object.keys(day.byProvider).length === 0
     && Object.keys(day.byModel).length === 0
+    && Object.keys(day.byRoute).length === 0
     && Object.keys(day.byTool).length === 0
     && Object.keys(day.byOrigin).length === 0) {
     delete record.days[dayName]
@@ -95,12 +100,20 @@ function usageMetrics(usage: UsageMetrics): Metrics {
   return metrics
 }
 
+function routeFacts(day: DayFacts, route: RouteRef): DayFacts['byRoute'][string] {
+  const key = JSON.stringify([route.provider, route.model])
+  return day.byRoute[key] ??= { ...route, metrics: emptyMetrics(), byOrigin: {} }
+}
+
 function applyUsage(record: SessionRecord, sample: UsageSample, factor: 1 | -1): void {
   const day = dayAt(record, sample.day)
   const metrics = scaleMetrics(usageMetrics(sample.usage), factor)
   addMetrics(day.totals, metrics)
   addMetrics(metricsAt(day.byProvider, sample.provider), metrics)
   addMetrics(metricsAt(day.byModel, sample.model), metrics)
+  const route = routeFacts(day, sample)
+  addMetrics(route.metrics, metrics)
+  addMetrics(route.byOrigin[sample.origin] ??= emptyMetrics(), metrics)
   addMetrics(originMetrics(day, sample.origin), metrics)
   if (factor === -1) removeEmptyDay(record, sample.day)
 }
@@ -110,6 +123,7 @@ function addRoutedMetrics(record: SessionRecord, dayName: string, route: RouteRe
   addMetrics(day.totals, metrics)
   addMetrics(metricsAt(day.byProvider, route.provider), metrics)
   addMetrics(metricsAt(day.byModel, route.model), metrics)
+  addMetrics(routeFacts(day, route).metrics, metrics)
 }
 
 function stepKey(turn: number, step: number): string {
