@@ -96,8 +96,13 @@ function breakdownQuery(params: URLSearchParams, source: ActivityHttpSource, con
   if (limit < 1 || limit > 200) throw new RequestError('limit must be between 1 and 200')
   const cursor = one(params, 'cursor')
   const search = one(params, 'search')
+  const selectedFilters = filters(params, source)
+  if (dimension === 'tool'
+    && ((selectedFilters.providers?.length ?? 0) > 0 || (selectedFilters.models?.length ?? 0) > 0)) {
+    throw new RequestError('provider and model filters are not supported for the tool dimension')
+  }
   return {
-    ...filters(params, source),
+    ...selectedFilters,
     dimension,
     sort,
     direction: enumValue(one(params, 'direction'), ['asc', 'desc'], 'desc', 'direction'),
@@ -117,7 +122,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 
 function csvCell(value: string | number): string {
   let text = String(value)
-  if (/^[=+\-@]/.test(text)) text = `'${text}`
+  if (/^[\t\r\n]|^\s*[=+\-@]/.test(text)) text = `'${text}`
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 
@@ -136,37 +141,52 @@ async function allBreakdownRows(
 }
 
 function csvRows(dimension: BreakdownDimension, rows: Awaited<ReturnType<typeof allBreakdownRows>>): string {
-  const headers = [
-    dimension, 'requests', 'input', 'cache_read', 'cache_write', 'output', 'reasoning', 'total_tokens',
-    'turns', 'steps', 'tool_calls', 'tool_results', 'tool_errors', 'model_ms', 'tool_ms', 'ttft_ms',
-    'ttft_samples', 'decode_ms', 'decode_tokens', 'title', 'workspace',
+  type Column = readonly [header: string, value: (row: BreakdownRow) => string | number]
+  const usage: Column[] = [
+    ['requests', row => row.metrics.usage.requests],
+    ['input', row => row.metrics.usage.input],
+    ['cache_read', row => row.metrics.usage.cacheRead],
+    ['cache_write', row => row.metrics.usage.cacheWrite],
+    ['output', row => row.metrics.usage.output],
+    ['reasoning', row => row.metrics.usage.reasoning],
+    ['total_tokens', row => totalTokens(row.metrics.usage)],
   ]
-  const lines = [headers.join(',')]
+  const columns: Column[] = dimension === 'tool'
+    ? [
+        ['tool', row => row.key],
+        ['tool_calls', row => row.metrics.activity.toolCalls],
+        ['tool_results', row => row.metrics.activity.toolResults],
+        ['tool_errors', row => row.metrics.activity.toolErrors],
+        ['tool_ms', row => row.metrics.performance.toolMs],
+      ]
+    : dimension === 'provider' || dimension === 'model'
+      ? [
+          [dimension, row => row.key], ...usage,
+          ['model_ms', row => row.metrics.performance.modelMs],
+          ['ttft_ms', row => row.metrics.performance.ttftMs],
+          ['ttft_samples', row => row.metrics.performance.ttftSamples],
+          ['decode_ms', row => row.metrics.performance.decodeMs],
+          ['decode_tokens', row => row.metrics.performance.decodeTokens],
+        ]
+      : [
+          [dimension, row => row.key], ...usage,
+          ['turns', row => row.metrics.activity.turns],
+          ['steps', row => row.metrics.activity.steps],
+          ['tool_calls', row => row.metrics.activity.toolCalls],
+          ['tool_results', row => row.metrics.activity.toolResults],
+          ['tool_errors', row => row.metrics.activity.toolErrors],
+          ['model_ms', row => row.metrics.performance.modelMs],
+          ['tool_ms', row => row.metrics.performance.toolMs],
+          ['ttft_ms', row => row.metrics.performance.ttftMs],
+          ['ttft_samples', row => row.metrics.performance.ttftSamples],
+          ['decode_ms', row => row.metrics.performance.decodeMs],
+          ['decode_tokens', row => row.metrics.performance.decodeTokens],
+          ['title', row => row.title ?? ''],
+          ['workspace', row => row.cwd ?? ''],
+        ]
+  const lines = [columns.map(([header]) => header).join(',')]
   for (const row of rows) {
-    const metrics = row.metrics
-    lines.push([
-      row.key,
-      metrics.usage.requests,
-      metrics.usage.input,
-      metrics.usage.cacheRead,
-      metrics.usage.cacheWrite,
-      metrics.usage.output,
-      metrics.usage.reasoning,
-      totalTokens(metrics.usage),
-      metrics.activity.turns,
-      metrics.activity.steps,
-      metrics.activity.toolCalls,
-      metrics.activity.toolResults,
-      metrics.activity.toolErrors,
-      metrics.performance.modelMs,
-      metrics.performance.toolMs,
-      metrics.performance.ttftMs,
-      metrics.performance.ttftSamples,
-      metrics.performance.decodeMs,
-      metrics.performance.decodeTokens,
-      row.title ?? '',
-      row.cwd ?? '',
-    ].map(csvCell).join(','))
+    lines.push(columns.map(([, value]) => csvCell(value(row))).join(','))
   }
   return `\uFEFF${lines.join('\r\n')}\r\n`
 }

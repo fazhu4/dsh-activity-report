@@ -99,4 +99,12 @@ describe('reconciled activity queries', () => {
       cursor: first.nextCursor,
     })).toThrow(/cursor/i)
   })
+
+  it('rejects route filters for unattributed tool facts', () => {
+    expect(() => queryBreakdown(records, {
+      range: 'today', timezone: 'Asia/Shanghai', now: NOW,
+      dimension: 'tool', sort: 'toolCalls', direction: 'desc', limit: 25,
+      providers: ['p1'],
+    })).toThrow(/not supported/i)
+  })
 })

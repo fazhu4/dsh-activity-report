@@ -96,7 +96,11 @@ function tabKeys<T>(event: KeyboardEvent<HTMLButtonElement>, current: T, values:
   event.preventDefault()
   const index = values.indexOf(current)
   const offset = event.key === 'ArrowRight' ? 1 : -1
-  select(values[(index + offset + values.length) % values.length]!)
+  const next = values[(index + offset + values.length) % values.length]!
+  select(next)
+  event.currentTarget.parentElement
+    ?.querySelector<HTMLButtonElement>(`[role="tab"][data-tab-value="${String(next)}"]`)
+    ?.focus()
 }
 
 /** OpenAI-usage-inspired local activity dashboard with DSH-specific semantics. */
@@ -118,6 +122,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const [error, setError] = useState<string | null>(null)
   const summaryRequest = useRef(0)
   const breakdownRequest = useRef(0)
+  const paginationController = useRef<AbortController | null>(null)
 
   const selectedFilters = useMemo(
     () => filtersQuery(range, workspace, provider, model),
@@ -127,6 +132,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     () => breakdownQuery(selectedFilters, dimension, sort, direction, search),
     [selectedFilters, dimension, sort, direction, search],
   )
+  const routeFilterActive = provider !== '' || model !== ''
 
   useEffect(() => {
     const controller = new AbortController()
@@ -134,7 +140,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
     })
     return () => { controller.abort() }
-  }, [api])
+  }, [api, refresh])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -171,7 +177,11 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     }).finally(() => {
       if (!controller.signal.aborted && request === breakdownRequest.current) setLoadingRows(false)
     })
-    return () => { controller.abort() }
+    return () => {
+      controller.abort()
+      paginationController.current?.abort()
+      paginationController.current = null
+    }
   }, [api, selectedBreakdown, refresh])
 
   const changeDimension = (next: BreakdownDimension): void => {
@@ -184,11 +194,22 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const loadMore = (): void => {
     if (page?.nextCursor === undefined || loadingRows) return
     const controller = new AbortController()
+    paginationController.current?.abort()
+    paginationController.current = controller
+    const request = breakdownRequest.current
     setLoadingRows(true)
     void api.breakdown({ ...selectedBreakdown, cursor: page.nextCursor }, controller.signal).then((next) => {
-      setPage({ ...next, rows: [...page.rows, ...next.rows] })
-    }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
-      .finally(() => setLoadingRows(false))
+      if (!controller.signal.aborted && request === breakdownRequest.current) {
+        setPage({ ...next, rows: [...page.rows, ...next.rows] })
+      }
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted && request === breakdownRequest.current) {
+        setError(cause instanceof Error ? cause.message : String(cause))
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted && request === breakdownRequest.current) setLoadingRows(false)
+      if (paginationController.current === controller) paginationController.current = null
+    })
   }
 
   const totals = summary?.totals
@@ -209,19 +230,24 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
           key={item.id}
           type="button"
           role="tab"
+          id={`dsh_activity_range_tab_${item.id}`}
+          aria-controls="dsh_activity_range_panel"
           aria-selected={range === item.id}
+          tabIndex={range === item.id ? 0 : -1}
+          data-tab-value={item.id}
           className={range === item.id ? 'is-active' : ''}
           onClick={() => setRange(item.id)}
           onKeyDown={(event) => tabKeys(event, range, ranges.map((value) => value.id), setRange)}
         >{t(item.key)}</button>)}
       </div>
       <FilterSelect value={workspace} onChange={setWorkspace} all={t('allWorkspaces')} values={options.workspaces} />
-      <FilterSelect value={provider} onChange={setProvider} all={t('allProviders')} values={options.providers} />
-      <FilterSelect value={model} onChange={setModel} all={t('allModels')} values={options.models} />
+      <FilterSelect value={provider} onChange={setProvider} all={t('allProviders')} values={options.providers} disabled={dimension === 'tool'} />
+      <FilterSelect value={model} onChange={setModel} all={t('allModels')} values={options.models} disabled={dimension === 'tool'} />
       <button type="button" className="dsh_activity_button" onClick={() => setRefresh((value) => value + 1)}>{t('refresh')}</button>
       <a className="dsh_activity_button" href={api.exportUrl(selectedBreakdown)} download>{t('export')}</a>
     </div>
 
+    <div role="tabpanel" id="dsh_activity_range_panel" aria-labelledby={`dsh_activity_range_tab_${range}`}>
     {summary !== null && <div className={`dsh_activity_status is-${summary.status.phase}`}>
       <strong>{statusLabel(summary, t)}</strong>
       <span>{t('processed')}: {int(summary.status.processedSessions)} / {int(summary.status.totalSessions)}</span>
@@ -254,12 +280,25 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
             key={item.id}
             type="button"
             role="tab"
+            id={`dsh_activity_dimension_tab_${item.id}`}
+            aria-controls="dsh_activity_dimension_panel"
             aria-selected={dimension === item.id}
+            tabIndex={dimension === item.id ? 0 : -1}
+            data-tab-value={item.id}
             className={dimension === item.id ? 'is-active' : ''}
+            disabled={item.id === 'tool' && routeFilterActive}
+            title={item.id === 'tool' && routeFilterActive ? t('toolFilterHint') : undefined}
             onClick={() => changeDimension(item.id)}
-            onKeyDown={(event) => tabKeys(event, dimension, dimensions.map((value) => value.id), changeDimension)}
+            onKeyDown={(event) => tabKeys(
+              event,
+              dimension,
+              dimensions.filter((value) => value.id !== 'tool' || !routeFilterActive).map((value) => value.id),
+              changeDimension,
+            )}
           >{t(item.key)}</button>)}
         </div>
+        {routeFilterActive && <p className="dsh_activity_privacy">{t('toolFilterHint')}</p>}
+        <div role="tabpanel" id="dsh_activity_dimension_panel" aria-labelledby={`dsh_activity_dimension_tab_${dimension}`}>
         <div className="dsh_activity_tableTools">
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('search')} aria-label={t('search')} />
           <select value={sort} onChange={(event) => setSort(event.target.value as BreakdownSort)} aria-label={t('sort')}>
@@ -278,16 +317,18 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
         {loadingRows && <div className="dsh_activity_loadingOverlay">{t('loading')}</div>}
         {!loadingRows && (page?.rows.length ?? 0) === 0 && <div className="dsh_activity_empty">{t('noData')}</div>}
         {page?.nextCursor !== undefined && <button type="button" className="dsh_activity_more" onClick={loadMore}>{t('loadMore')}</button>}
+        </div>
       </section>
 
       <Performance metrics={totals} t={t} />
       <details className="dsh_activity_notes"><summary>{t('metricNotes')}</summary><p>{t('metricNotesBody')}</p></details>
     </>}
+    </div>
   </div>
 }
 
-function FilterSelect({ value, onChange, all, values }: { value: string; onChange: (value: string) => void; all: string; values: string[] }): JSX.Element {
-  return <select value={value} onChange={(event) => onChange(event.target.value)} aria-label={all}>
+function FilterSelect({ value, onChange, all, values, disabled = false }: { value: string; onChange: (value: string) => void; all: string; values: string[]; disabled?: boolean }): JSX.Element {
+  return <select value={value} onChange={(event) => onChange(event.target.value)} aria-label={all} disabled={disabled}>
     <option value="">{all}</option>
     {values.map((item) => <option key={item} value={item}>{item}</option>)}
   </select>

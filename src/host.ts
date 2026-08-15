@@ -8,6 +8,7 @@ import type { FoldState } from './fold.ts'
 export interface ActivityTable {
   entries(): IterableIterator<[SessionId, SessionRecord]>
   put(id: SessionId, record: SessionRecord): Promise<void>
+  delete(id: SessionId): Promise<boolean>
 }
 
 /** Open storage-domain handle owned by this plugin instance. */
@@ -58,6 +59,7 @@ export class ActivityRuntime {
   private table?: ActivityTable
   private timer?: ReturnType<typeof setTimeout>
   private writeTail: Promise<void> = Promise.resolve()
+  private startup?: Promise<void>
   private started = false
   private accepting = true
   private phase: ActivityRuntimeStatus['phase'] = 'backfilling'
@@ -72,9 +74,14 @@ export class ActivityRuntime {
   ) {}
 
   /** Open storage, hydrate records, replay the logical corpus, and drain startup buffers. */
-  async start(): Promise<void> {
+  start(): Promise<void> {
     if (this.started) throw new Error('activity runtime has already started')
     this.started = true
+    this.startup = this.startInternal()
+    return this.startup
+  }
+
+  private async startInternal(): Promise<void> {
     this.domain = await this.deps.storageDomain.open(activityReportDomainSpec)
     this.table = this.domain.table('sessions')
     for (const [id, record] of this.table.entries()) {
@@ -85,6 +92,13 @@ export class ActivityRuntime {
     const sessions = await this.deps.sessionQuery.listSessions(this.abort.signal)
     for (const { header } of sessions) this.countedSessions.add(header.id)
     this.totalSessions = this.countedSessions.size
+    for (const id of [...this.states.keys()]) {
+      if (this.countedSessions.has(id) || this.buffered.has(id)) continue
+      await this.table.delete(id)
+      this.states.delete(id)
+      this.revisions.delete(id)
+      this.dirty.delete(id)
+    }
     let cursor = 0
     const workers = Array.from({ length: Math.min(this.config.backfillConcurrency, Math.max(1, sessions.length)) }, async () => {
       while (!this.abort.signal.aborted) {
@@ -175,6 +189,11 @@ export class ActivityRuntime {
     if (this.timer !== undefined) {
       clearTimeout(this.timer)
       this.timer = undefined
+    }
+    try {
+      await this.startup
+    } catch (error) {
+      this.deps.onError?.(error)
     }
     await this.flush()
     await this.domain?.close()

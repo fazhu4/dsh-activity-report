@@ -11,6 +11,7 @@ DeepSeek Harness 的本地只读用量面板。它从 DSH 会话事件中统计 
 - 分开展示未缓存输入、缓存读取、缓存写入、输出和输出中的推理 Token。
 - 展示已计量请求、活跃工作区、活跃会话、Agent Usage 覆盖率和缓存复用率。
 - 提供工作区、服务商、模型、会话和工具五种分页明细，可搜索和排序。
+- 工具事件没有精确的服务商/模型归因，因此工具维度会禁用这两项筛选，API 对该组合返回 HTTP 400。
 - 统计平均首 Token 时间、输出速度、模型耗时、工具耗时、工具失败和轮次结果。
 - 导出与当前筛选及分析维度一致的 UTF-8 CSV。
 - 会话行通过 DSH 客户端会话服务打开，不构造私有 URL。
@@ -59,6 +60,8 @@ dsh plugin --profile web add github:fazhu4/dsh-activity-report
 
 插件只读取 DSH 已有的本地会话语料，并通过 DSH `storageDomain` 的 `activity_report` domain 固化每会话聚合记录。实际介质由 DSH profile 的 storage backend 决定。界面和导出不包含提示词、回复正文、工具参数或工具输出。
 
+当源会话从 DSH 逻辑语料中移除时，插件只清理自己对应的派生聚合记录，不修改或删除 DSH 会话数据。
+
 ## 配置
 
 `cordis.patch.yml` 暴露以下部署参数：
@@ -78,7 +81,7 @@ dsh plugin --profile web add github:fazhu4/dsh-activity-report
 | `GET /dsh-activity-report/filters` | 可用工作区、服务商、模型和已观察日期范围 |
 | `GET /dsh-activity-report/export.csv` | 当前筛选和维度的完整 CSV |
 
-所有数据接口接受 `range=today|7d|30d|all`，以及可重复的 `workspace`、`provider` 和 `model` 参数。无效枚举、排序、游标或页大小返回 HTTP 400。
+所有数据接口接受 `range=today|7d|30d|all`，以及可重复的 `workspace`、`provider` 和 `model` 参数。工具维度不接受 `provider` 或 `model`。无效筛选组合、枚举、排序、游标或页大小返回 HTTP 400。
 
 ## 开发与验证
 

@@ -28,18 +28,23 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function fakeDomain(initial?: SessionRecord): ActivityDomain & { closed: boolean; puts: SessionRecord[] } {
+function fakeDomain(initial?: SessionRecord): ActivityDomain & { closed: boolean; puts: SessionRecord[]; deletes: SessionId[] } {
   const records = new Map<SessionId, SessionRecord>()
   if (initial !== undefined) records.set(initial.sessionId, structuredClone(initial))
   const domain = {
     closed: false,
     puts: [] as SessionRecord[],
+    deletes: [] as SessionId[],
     table: () => ({
       entries: () => new Map(records).entries(),
       put: async (id: SessionId, record: SessionRecord) => {
         const copy = structuredClone(record)
         records.set(id, copy)
         domain.puts.push(copy)
+      },
+      delete: async (id: SessionId) => {
+        domain.deletes.push(id)
+        return records.delete(id)
       },
     }),
     close: async () => { domain.closed = true },
@@ -130,5 +135,49 @@ describe('activity host lifecycle', () => {
     expect(runtime.records()[0]?.metadata).toEqual({ cwd: 'G:/project', createdAt: 1 })
     expect(domain.puts.at(-1)?.metadata).toEqual({ cwd: 'G:/project', createdAt: 1 })
     await runtime.dispose()
+  })
+
+  it('removes derived records absent from the logical session corpus', async () => {
+    const stale = createFoldState(SESSION_ID, { cwd: 'G:/deleted' }).record
+    const domain = fakeDomain(stale)
+    const runtime = new ActivityRuntime({
+      ...dependencies(domain, async () => ({ session: header(), events: [] })),
+      sessionQuery: {
+        listSessions: async () => [],
+        readSession: async () => ({ session: header(), events: [] }),
+        readTitle: async () => undefined,
+      },
+    }, { persistDebounceMs: 0, backfillConcurrency: 1 })
+
+    await runtime.start()
+
+    expect(runtime.records()).toEqual([])
+    expect(domain.deletes).toEqual([SESSION_ID])
+    await runtime.dispose()
+  })
+
+  it('waits for in-flight backfill before closing the domain', async () => {
+    const domain = fakeDomain()
+    const read = deferred<{ session: SessionHeader; events: SessionEvent[] }>()
+    const readStarted = deferred<void>()
+    const runtime = new ActivityRuntime(dependencies(domain, async () => {
+      readStarted.resolve()
+      return read.promise
+    }), {
+      persistDebounceMs: 0,
+      backfillConcurrency: 1,
+    })
+    const starting = runtime.start()
+    await readStarted.promise
+
+    const disposing = runtime.dispose()
+    await Promise.resolve()
+    expect(domain.closed).toBe(false)
+
+    read.resolve({ session: header(), events: [event(0)] })
+    await starting
+    await disposing
+    expect(domain.closed).toBe(true)
+    expect(runtime.status().phase).toBe('disposed')
   })
 })

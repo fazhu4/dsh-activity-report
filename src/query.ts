@@ -247,6 +247,9 @@ function collectRows(records: readonly SessionRecord[], query: BreakdownQuery, b
 /** Return one stable cursor-paginated analysis table. */
 export function queryBreakdown(records: readonly SessionRecord[], query: BreakdownQuery): BreakdownPage {
   if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 200) throw new Error('limit must be between 1 and 200')
+  if (query.dimension === 'tool' && hasRouteFilter(query)) {
+    throw new Error('provider and model filters are not supported for the tool dimension')
+  }
   const bounds = resolveBounds(records, query)
   const search = query.search?.trim().toLocaleLowerCase()
   const rows = collectRows(records, query, bounds)

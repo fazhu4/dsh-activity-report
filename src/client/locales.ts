@@ -20,6 +20,7 @@ export interface LocaleDict {
   turns: string; steps: string; calls: string; results: string; errors: string
   modelTime: string; toolTime: string; avgTtft: string; outputSpeed: string; errorRate: string; average: string
   performance: string; outcomes: string; metricNotes: string; metricNotesBody: string
+  toolFilterHint: string
 }
 
 export const zh: LocaleDict = {
@@ -38,6 +39,7 @@ export const zh: LocaleDict = {
   turns: '轮次', steps: '步骤', calls: '调用', results: '已返回', errors: '失败',
   modelTime: '模型耗时', toolTime: '工具耗时', avgTtft: '平均首 Token', outputSpeed: '输出速度', errorRate: '失败率', average: '平均耗时',
   performance: '性能与结果', outcomes: '轮次结果', metricNotes: '指标说明',
+  toolFilterHint: '工具事件不能精确归因到服务商或模型；清除这两项筛选后查看工具维度。',
   metricNotesBody: '输入、缓存读取、缓存写入和输出是互斥计量桶；推理 Token 是输出子集。今天、近 7 天和近 30 天按本机时区的自然日计算。覆盖率不足时显示“未报告”，不会把缺失数据当作零。',
 }
 
@@ -57,5 +59,6 @@ export const en: LocaleDict = {
   turns: 'Turns', steps: 'Steps', calls: 'Calls', results: 'Returned', errors: 'Errors',
   modelTime: 'Model time', toolTime: 'Tool time', avgTtft: 'Average TTFT', outputSpeed: 'Output speed', errorRate: 'Error rate', average: 'Average',
   performance: 'Performance and outcomes', outcomes: 'Turn outcomes', metricNotes: 'Metric definitions',
+  toolFilterHint: 'Tool events cannot be attributed exactly to a provider or model. Clear those filters to view tools.',
   metricNotesBody: 'Input, cache read, cache write, and output are disjoint accounting buckets; reasoning tokens are a subset of output. Today, 7-day, and 30-day ranges use calendar days in the host timezone. Missing samples are reported as unavailable instead of zero.',
 }

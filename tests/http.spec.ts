@@ -7,13 +7,13 @@ import type { ActivityHttpSource, WebRoute } from '../src/http.ts'
 
 const SESSION_ID = 'session-1' as SessionId
 
-function source(): ActivityHttpSource {
+function source(model = 'summary-model'): ActivityHttpSource {
   const state = createFoldState(SESSION_ID, { cwd: 'G:/project', title: 'Inspect usage' })
   foldEvents(state, [{
     seq: 0,
     time: Date.parse('2026-08-16T10:00:00+08:00'),
     type: 'compaction/summary',
-    data: { provider: 'deepseek', model: 'summary-model', usage: { inputTokens: 20, outputTokens: 5 } },
+    data: { provider: 'deepseek', model, usage: { inputTokens: 20, outputTokens: 5 } },
   } as SessionEvent], 'Asia/Shanghai')
   return {
     records: () => [state.record],
@@ -25,14 +25,14 @@ function source(): ActivityHttpSource {
   }
 }
 
-function harness() {
+function harness(model?: string) {
   const routes = new Map<string, WebRoute>()
   const dispose = registerActivityRoutes({
     register: (route) => {
       routes.set(route.path, route)
       return () => { routes.delete(route.path) }
     },
-  }, source(), { defaultPageSize: 25 })
+  }, source(model), { defaultPageSize: 25 })
   async function request(path: string) {
     const pathname = new URL(path, 'http://localhost').pathname
     const route = routes.get(pathname)
@@ -58,6 +58,7 @@ describe('activity report HTTP API', () => {
     '/dsh-activity-report/breakdown?dimension=model&limit=9999',
     '/dsh-activity-report/breakdown?dimension=model&cursor=bad',
     '/dsh-activity-report/breakdown?dimension=tool&sort=requests',
+    '/dsh-activity-report/breakdown?dimension=tool&provider=deepseek',
   ])('rejects invalid query %s', async (path) => {
     const response = await harness().request(path)
     expect(response.status).toBe(400)
@@ -79,8 +80,20 @@ describe('activity report HTTP API', () => {
     expect(response.status).toBe(200)
     expect(response.headers['Content-Type']).toContain('text/csv')
     expect(response.headers['Content-Disposition']).toContain('dsh-activity-model-2026-08-16.csv')
-    expect(response.body).toContain('\uFEFFmodel,requests,input,cache_read,cache_write,output,reasoning,total_tokens')
+    expect(response.body.split('\r\n')[0]).toBe('\uFEFFmodel,requests,input,cache_read,cache_write,output,reasoning,total_tokens,model_ms,ttft_ms,ttft_samples,decode_ms,decode_tokens')
     expect(response.body).toContain('summary-model,1,20,0,0,5,0,25')
+    expect(response.body).not.toContain('tool_calls')
+    expect(response.body).not.toContain('turns')
+  })
+
+  it('exports only tool-attributable columns for the tool dimension', async () => {
+    const response = await harness().request('/dsh-activity-report/export.csv?range=today&dimension=tool')
+    expect(response.body).toBe('\uFEFFtool,tool_calls,tool_results,tool_errors,tool_ms\r\n')
+  })
+
+  it('neutralizes whitespace-prefixed spreadsheet formulas', async () => {
+    const response = await harness(' \t=2+2').request('/dsh-activity-report/export.csv?range=today&dimension=model')
+    expect(response.body).toContain("' \t=2+2")
   })
 
   it('registers and disposes all four exact routes', () => {

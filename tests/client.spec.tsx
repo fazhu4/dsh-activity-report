@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ActivitySummaryResponse, BreakdownPage } from '../src/contract.ts'
@@ -106,5 +106,82 @@ describe('activity report client', () => {
 
     expect(await screen.findByText('自然日: 2026-08-16')).toBeInTheDocument()
     expect(screen.queryByText(/2026-08-17/)).not.toBeInTheDocument()
+  })
+
+  it('discards pagination that resolves after the analysis query changes', async () => {
+    const metrics = emptyMetrics()
+    metrics.usage.input = 10
+    const more = deferred<BreakdownPage>()
+    const api: ActivityClient = {
+      summary: async () => summary(10),
+      breakdown: async (query) => {
+        if (query.cursor !== undefined) return more.promise
+        if (query.dimension === 'session') {
+          return {
+            dimension: 'session',
+            rows: [{ key: 'session-1', sessionId: 'session-1' as SessionId, title: 'Current session', metrics }],
+          }
+        }
+        return { dimension: 'model', rows: [{ key: 'initial-model', metrics }], nextCursor: 'next' }
+      },
+      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      exportUrl: () => '#',
+    }
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    await screen.findByText('initial-model')
+    fireEvent.click(screen.getByRole('button', { name: '加载更多' }))
+    fireEvent.click(screen.getByRole('tab', { name: '会话' }))
+    await screen.findByRole('button', { name: 'Current session' })
+    await act(async () => {
+      more.resolve({ dimension: 'model', rows: [{ key: 'stale-model', metrics }] })
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('stale-model')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Current session' })).toBeInTheDocument()
+  })
+
+  it('uses roving focus and linked tab panels', async () => {
+    const api: ActivityClient = {
+      summary: async () => summary(10),
+      breakdown: async () => emptyPage,
+      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      exportUrl: () => '#',
+    }
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+    await screen.findByText('总处理 Token')
+
+    const today = screen.getByRole('tab', { name: '今天' })
+    const seven = screen.getByRole('tab', { name: '近 7 天' })
+    today.focus()
+    fireEvent.keyDown(today, { key: 'ArrowRight' })
+    expect(seven).toHaveFocus()
+    expect(seven).toHaveAttribute('aria-selected', 'true')
+    expect(seven).toHaveAttribute('tabindex', '0')
+    expect(document.getElementById(seven.getAttribute('aria-controls')!)).toHaveAttribute('role', 'tabpanel')
+
+    const model = screen.getByRole('tab', { name: '模型' })
+    const session = screen.getByRole('tab', { name: '会话' })
+    model.focus()
+    fireEvent.keyDown(model, { key: 'ArrowRight' })
+    expect(session).toHaveFocus()
+    expect(session).toHaveAttribute('aria-selected', 'true')
+    expect(document.getElementById(session.getAttribute('aria-controls')!)).toHaveAttribute('role', 'tabpanel')
+  })
+
+  it('explains and disables unsupported tool attribution filters', async () => {
+    const api: ActivityClient = {
+      summary: async () => summary(10),
+      breakdown: async () => emptyPage,
+      filters: async () => ({ workspaces: [], providers: ['deepseek'], models: [], startDay: '2026-08-16', endDay: '2026-08-16' }),
+      exportUrl: () => '#',
+    }
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+    const provider = await screen.findByRole('combobox', { name: '所有服务商' })
+    fireEvent.change(provider, { target: { value: 'deepseek' } })
+
+    expect(screen.getByRole('tab', { name: '工具' })).toBeDisabled()
+    expect(screen.getByText(/工具事件不能精确归因/)).toBeInTheDocument()
   })
 })
