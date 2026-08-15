@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-compaction/types'
+import { activityReportDomainSpec } from '../src/domain.ts'
 import { createFoldState, foldEvents } from '../src/fold.ts'
 import { totalTokens } from '../src/metrics.ts'
 
@@ -55,6 +56,7 @@ describe('session activity fold', () => {
       messageSamples: 1,
     })
     expect(totalTokens(day.totals.usage)).toBe(21)
+    expect(activityReportDomainSpec.tables.sessions.valueSchema.safeParse(state.record).success).toBe(true)
   })
 
   it('retains usage when a failed step never assembles a message', () => {

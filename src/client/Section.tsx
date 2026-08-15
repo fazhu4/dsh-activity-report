@@ -85,6 +85,12 @@ function statusLabel(data: ActivitySummaryResponse, t: ActivityT): string {
   }
 }
 
+function inclusiveDayRange(startDay: string, endDayExclusive: string): string {
+  const [year, month, day] = endDayExclusive.split('-').map(Number) as [number, number, number]
+  const endDay = new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10)
+  return startDay === endDay ? startDay : `${startDay} – ${endDay}`
+}
+
 function tabKeys<T>(event: KeyboardEvent<HTMLButtonElement>, current: T, values: readonly T[], select: (value: T) => void): void {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
   event.preventDefault()
@@ -219,7 +225,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     {summary !== null && <div className={`dsh_activity_status is-${summary.status.phase}`}>
       <strong>{statusLabel(summary, t)}</strong>
       <span>{t('processed')}: {int(summary.status.processedSessions)} / {int(summary.status.totalSessions)}</span>
-      <span>{t('localDays')}: {summary.startDay} – {summary.endDayExclusive}</span>
+      <span>{t('localDays')}: {inclusiveDayRange(summary.startDay, summary.endDayExclusive)}</span>
       {summary.status.lastPersistedAt !== undefined && <span>{t('persisted')}: {new Date(summary.status.lastPersistedAt).toLocaleString()}</span>}
     </div>}
 

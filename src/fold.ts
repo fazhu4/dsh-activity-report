@@ -102,7 +102,12 @@ function usageMetrics(usage: UsageMetrics): Metrics {
 
 function routeFacts(day: DayFacts, route: RouteRef): DayFacts['byRoute'][string] {
   const key = JSON.stringify([route.provider, route.model])
-  return day.byRoute[key] ??= { ...route, metrics: emptyMetrics(), byOrigin: {} }
+  return day.byRoute[key] ??= {
+    provider: route.provider,
+    model: route.model,
+    metrics: emptyMetrics(),
+    byOrigin: {},
+  }
 }
 
 function applyUsage(record: SessionRecord, sample: UsageSample, factor: 1 | -1): void {

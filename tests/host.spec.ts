@@ -71,7 +71,7 @@ describe('activity host lifecycle', () => {
     })
 
     const starting = runtime.start()
-    runtime.acceptLive(SESSION_ID, event(5))
+    runtime.acceptLive(header(), event(5))
     read.resolve({ session: header(), events: [event(3), event(4)] })
     await starting
 
@@ -89,7 +89,7 @@ describe('activity host lifecycle', () => {
       backfillConcurrency: 1,
     })
     await runtime.start()
-    runtime.acceptLive(SESSION_ID, event(0))
+    runtime.acceptLive(header(), event(0))
     await runtime.dispose()
 
     expect(domain.puts.at(-1)?.days['1970-01-01']?.totals.usage.requests).toBe(1)
@@ -105,6 +105,30 @@ describe('activity host lifecycle', () => {
     await runtime.start()
 
     expect(domain.puts.at(-1)?.metadata).toEqual({ cwd: 'G:/project', title: 'Usage session', createdAt: 1 })
+    await runtime.dispose()
+  })
+
+  it('tracks metadata and progress for a session created after backfill', async () => {
+    const domain = fakeDomain()
+    const runtime = new ActivityRuntime({
+      ...dependencies(domain, async () => ({ session: header(), events: [] })),
+      sessionQuery: {
+        listSessions: async () => [],
+        readSession: async () => ({ session: header(), events: [] }),
+        readTitle: async () => undefined,
+      },
+    }, {
+      persistDebounceMs: 0,
+      backfillConcurrency: 1,
+    })
+    await runtime.start()
+
+    runtime.acceptLive(header(), event(0))
+    await runtime.flush()
+
+    expect(runtime.status()).toMatchObject({ processedSessions: 1, totalSessions: 1 })
+    expect(runtime.records()[0]?.metadata).toEqual({ cwd: 'G:/project', createdAt: 1 })
+    expect(domain.puts.at(-1)?.metadata).toEqual({ cwd: 'G:/project', createdAt: 1 })
     await runtime.dispose()
   })
 })

@@ -51,6 +51,8 @@ export class ActivityRuntime {
   private readonly revisions = new Map<SessionId, number>()
   private readonly dirty = new Set<SessionId>()
   private readonly buffered = new Map<SessionId, SessionEvent[]>()
+  private readonly bufferedHeaders = new Map<SessionId, SessionHeader>()
+  private readonly countedSessions = new Set<SessionId>()
   private readonly abort = new AbortController()
   private domain?: ActivityDomain
   private table?: ActivityTable
@@ -81,7 +83,8 @@ export class ActivityRuntime {
     }
 
     const sessions = await this.deps.sessionQuery.listSessions(this.abort.signal)
-    this.totalSessions = sessions.length
+    for (const { header } of sessions) this.countedSessions.add(header.id)
+    this.totalSessions = this.countedSessions.size
     let cursor = 0
     const workers = Array.from({ length: Math.min(this.config.backfillConcurrency, Math.max(1, sessions.length)) }, async () => {
       while (!this.abort.signal.aborted) {
@@ -99,15 +102,23 @@ export class ActivityRuntime {
   }
 
   /** Accept one post-commit live Session event without awaiting storage. */
-  acceptLive(sessionId: SessionId, event: SessionEvent): void {
+  acceptLive(header: SessionHeader, event: SessionEvent): void {
     if (!this.accepting) return
     if (this.phase === 'backfilling') {
-      const events = this.buffered.get(sessionId) ?? []
+      const events = this.buffered.get(header.id) ?? []
       events.push(event)
-      this.buffered.set(sessionId, events)
+      this.buffered.set(header.id, events)
+      this.bufferedHeaders.set(header.id, header)
       return
     }
-    this.fold(sessionId, [event])
+    const discovered = !this.countedSessions.has(header.id)
+    if (discovered) {
+      this.countedSessions.add(header.id)
+      this.totalSessions += 1
+      this.processedSessions += 1
+    }
+    this.mergeMetadata(header.id, metadata(header))
+    this.fold(header.id, [event])
     this.schedulePersist()
   }
 
@@ -206,7 +217,28 @@ export class ActivityRuntime {
     const events = this.buffered.get(id)
     if (events === undefined) return
     this.buffered.delete(id)
+    const header = this.bufferedHeaders.get(id)
+    this.bufferedHeaders.delete(id)
+    if (header !== undefined) this.mergeMetadata(id, metadata(header))
+    if (!this.countedSessions.has(id)) {
+      this.countedSessions.add(id)
+      this.totalSessions += 1
+      this.processedSessions += 1
+    }
     this.fold(id, events.sort((left, right) => left.seq - right.seq))
+  }
+
+  private mergeMetadata(id: SessionId, next: SessionRecord['metadata']): void {
+    const state = this.states.get(id)
+    if (state === undefined) {
+      this.states.set(id, createFoldState(id, next))
+      this.markDirty(id)
+      return
+    }
+    const merged = { ...state.record.metadata, ...next }
+    if (JSON.stringify(state.record.metadata) === JSON.stringify(merged)) return
+    state.record.metadata = merged
+    this.markDirty(id)
   }
 
   private fold(id: SessionId, events: readonly SessionEvent[]): void {

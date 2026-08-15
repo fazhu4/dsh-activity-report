@@ -94,4 +94,17 @@ describe('activity report client', () => {
     fireEvent.click(screen.getByRole('tab', { name: '工具' }))
     await waitFor(() => expect(screen.getByRole('tab', { name: '工具' })).toHaveAttribute('aria-selected', 'true'))
   })
+
+  it('displays the inclusive natural-day range', async () => {
+    const api: ActivityClient = {
+      summary: async () => summary(10),
+      breakdown: async () => emptyPage,
+      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      exportUrl: () => '#',
+    }
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    expect(await screen.findByText('自然日: 2026-08-16')).toBeInTheDocument()
+    expect(screen.queryByText(/2026-08-17/)).not.toBeInTheDocument()
+  })
 })

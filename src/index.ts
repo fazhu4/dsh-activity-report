@@ -57,7 +57,7 @@ export async function apply(ctx: Context & { webServer: WebServerFace }, config:
   }, resolved)
 
   const offEvent = ctx.on('session/event', (session, event) => {
-    runtime.acceptLive(session.id, event)
+    runtime.acceptLive(session.header, event)
   })
   const offFlush = ctx.on('session/flush', () => runtime.flush())
   const offRoutes = registerActivityRoutes(ctx.webServer, {
