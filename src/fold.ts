@@ -262,7 +262,7 @@ export function foldEvent(state: FoldState, event: SessionEvent, timeZone?: stri
       metrics.activity.toolResults = 1
       metrics.activity.toolErrors = adapted.failed ? 1 : 0
       metrics.performance.toolMs = Math.max(0, adapted.time - pending.startTime)
-      const day = dayAt(record, pending.day)
+      const day = dayAt(record, pending.day ?? dayKey(pending.startTime, timeZone))
       addMetrics(day.totals, metrics)
       addMetrics(metricsAt(day.byTool, pending.name), metrics)
       delete record.runtime.pendingTools[adapted.callId]

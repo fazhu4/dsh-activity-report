@@ -44,6 +44,8 @@ export interface OpenStep {
   firstTokenTime?: number
   messageTime?: number
   messageOutputTokens?: number
+  /** Accepted only so version-zero cached records can be opened and rebuilt. */
+  messageRecorded?: boolean
   route?: RouteRef
 }
 
@@ -51,7 +53,7 @@ export interface OpenStep {
 export interface PendingTool {
   name: string
   startTime: number
-  day: string
+  day?: string
 }
 
 /** Cross-event state required to continue an incremental fold after restart. */
@@ -75,6 +77,8 @@ export interface SessionMetadata {
 /** One atomically persisted per-session fold. */
 export interface SessionRecord {
   sessionId: SessionId
+  /** Derived aggregation algorithm identity; missing records are rebuilt from source. */
+  aggregationVersion?: number
   /** IANA timezone used to assign this derived projection's day buckets. */
   timezone?: string
   watermark: number

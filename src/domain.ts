@@ -54,6 +54,7 @@ const routeSchema = z.object({ provider: z.string(), model: z.string() }).strict
 
 const sessionRecordSchema = z.object({
   sessionId: z.string(),
+  aggregationVersion: count.optional(),
   timezone: z.string().optional(),
   watermark: z.number().int().min(-1),
   metadata: z.object({
@@ -70,6 +71,7 @@ const sessionRecordSchema = z.object({
       firstTokenTime: z.number().optional(),
       messageTime: z.number().optional(),
       messageOutputTokens: count.optional(),
+      messageRecorded: z.boolean().optional(),
       route: routeSchema.optional(),
     }).strict().optional(),
     openUsage: z.object({
@@ -81,7 +83,7 @@ const sessionRecordSchema = z.object({
       usage: usageSchema,
     }).strict().optional(),
     lastCountedTurn: z.number().int().nonnegative().nullable(),
-    pendingTools: z.record(z.string(), z.object({ name: z.string(), startTime: z.number(), day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict()),
+    pendingTools: z.record(z.string(), z.object({ name: z.string(), startTime: z.number(), day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).strict()),
     seenToolCalls: z.record(z.string(), z.literal(true)).optional(),
   }).strict(),
   days: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), dayFactsSchema),
@@ -90,7 +92,7 @@ const sessionRecordSchema = z.object({
 /** Versioned storage-domain declaration for activity folds. */
 export const activityReportDomainSpec = defineDomain({
   name: 'activity_report',
-  version: 1,
+  version: 0,
   tables: {
     sessions: domainTable<SessionId, SessionRecord>(sessionRecordSchema),
   },
@@ -100,6 +102,7 @@ export const activityReportDomainSpec = defineDomain({
 export function createSessionRecord(sessionId: SessionId, metadata: SessionMetadata = {}, timezone?: string): SessionRecord {
   return {
     sessionId,
+    aggregationVersion: 1,
     ...(timezone === undefined ? {} : { timezone }),
     watermark: -1,
     metadata: { ...metadata },

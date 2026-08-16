@@ -50,7 +50,7 @@ dsh plugin --profile web add link:G:/项目/git/demo/activity-report-v1
 
 推理 Token 是输出的子集，不会再次加入总量。缓存复用率为缓存读取除以总输入 Token。Agent Usage 覆盖率为带 provider usage 的闭合步骤数除以全部闭合步骤数；模型耗时覆盖率和工具耗时覆盖率分别使用同一自然日 cohort 的已测样本数与闭合步骤/工具调用数。没有分母时显示“未报告”。工具失败率以已经返回结果的工具调用为分母。
 
-`today`、`7d` 和 `30d` 使用配置的 IANA 时区自然日。API 返回实际 `timezone`、`startDay` 和排他的 `endDayExclusive`。卡片、趋势和明细从同一批日期桶聚合。时区改变时，插件会丢弃不兼容的派生缓存并从会话事件重建，绝不混合不同日期口径。
+`today`、`7d` 和 `30d` 使用配置的 IANA 时区自然日。API 返回实际 `timezone`、`startDay` 和排他的 `endDayExclusive`。卡片、趋势和明细从同一批日期桶聚合。时区或聚合算法版本改变时，插件会在打开兼容的 storage domain 后丢弃旧派生缓存并从会话事件重建，绝不混合不同统计口径。
 
 ## 数据准确性
 

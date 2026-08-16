@@ -92,7 +92,7 @@ export class ActivityRuntime {
     this.table = this.domain.table('sessions')
     const incompatible = new Set<SessionId>()
     for (const [id, record] of this.table.entries()) {
-      if (record.timezone !== this.timezone) {
+      if (record.timezone !== this.timezone || record.aggregationVersion !== 1) {
         incompatible.add(id)
         continue
       }

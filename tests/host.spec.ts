@@ -85,6 +85,22 @@ function dependencies(domain: ActivityDomain, readSession: ActivityRuntimeDeps['
 }
 
 describe('activity host lifecycle', () => {
+  it('rebuilds an older aggregation record without changing the storage domain version', async () => {
+    const persisted = createFoldState(SESSION_ID, { cwd: 'G:/project' }, 'Asia/Shanghai')
+    foldEvents(persisted, [event(0)], 'Asia/Shanghai')
+    delete persisted.record.aggregationVersion
+    const domain = fakeDomain(persisted.record)
+    const runtime = new ActivityRuntime(dependencies(domain, async () => ({
+      session: header(), events: [event(0), event(1)],
+    })), { persistDebounceMs: 0, backfillConcurrency: 1, timezone: 'Asia/Shanghai' })
+
+    await runtime.start()
+
+    expect(domain.deletes).toEqual([SESSION_ID])
+    expect(runtime.records()[0]).toMatchObject({ aggregationVersion: 1, watermark: 1 })
+    await runtime.dispose()
+  })
+
   it('rebuilds a persisted projection when its timezone differs from configuration', async () => {
     const persisted = createFoldState(SESSION_ID, { cwd: 'G:/project' })
     const boundary = Date.UTC(2026, 7, 15, 18)
