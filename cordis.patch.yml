@@ -3,10 +3,9 @@
 - insert:
     - id: dsh-activity-report
       name: 'dsh-activity-report'
-      # webServer 提供 HTTP 数据路由；sessionQuery 回填历史；sessions 增量监听
-      inject: ['webServer', 'sessionQuery', 'sessions', 'fs']
+      inject: ['webServer', 'sessionQuery', 'sessions', 'storageDomain']
       config:
-        # 固化存储文件名（相对 $DSH_HOME/storages/）
-        storeFile: activity-report.json
-        # 运行中增量落盘 debounce 毫秒
-        saveDebounceMs: 2000
+        persistDebounceMs: 1000
+        backfillConcurrency: 4
+        defaultPageSize: 25
+        timezone: !!js Intl.DateTimeFormat().resolvedOptions().timeZone

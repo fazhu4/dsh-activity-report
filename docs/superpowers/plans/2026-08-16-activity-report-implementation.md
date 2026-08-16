@@ -12,7 +12,7 @@
 
 ## File map
 
-- Create `src/domain.ts`: Zod schemas and the versioned `activity-report` storage domain.
+- Create `src/domain.ts`: Zod schemas and the versioned `activity_report` storage domain.
 - Replace `src/contract.ts`: client-safe query and response types.
 - Create `src/metrics.ts`: zero/add/subtract/ratio helpers and reconciliation invariants.
 - Replace `src/adapt.ts`: typed DSH event adaptation, including usage chunks and compaction usage.
@@ -98,7 +98,7 @@ export interface Metrics {
 }
 ```
 
-Define `DayFacts` with totals plus `byProvider`, `byModel`, `byTool`, and request-origin maps. Define `SessionRecord` with metadata, watermark, fold state, and `days`. Use `defineDomain({ name: 'activity-report', version: 0, tables: { sessions: domainTable<SessionId, SessionRecord>(sessionRecordSchema) } })` so durable reads reject malformed records.
+Define `DayFacts` with totals plus `byProvider`, `byModel`, `byTool`, and request-origin maps. Define `SessionRecord` with metadata, watermark, fold state, and `days`. Use `defineDomain({ name: 'activity_report', version: 0, tables: { sessions: domainTable<SessionId, SessionRecord>(sessionRecordSchema) } })` so durable reads reject malformed records.
 
 - [ ] **Step 4: Run `pnpm vitest run tests/metrics.spec.ts` and `pnpm run typecheck`; expect PASS.**
 

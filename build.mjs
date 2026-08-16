@@ -1,46 +1,40 @@
-/**
- * dsh-activity-report build: esbuild bundles for host (Node) and client (browser).
- * Produces lib/index.js (host plugin) and lib/client.js (client bundle), plus
- * .d.ts declarations for the public entry points.
- */
 import { build } from 'esbuild'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = dirname(fileURLToPath(import.meta.url))
+const output = join(root, 'lib')
+rmSync(output, { recursive: true, force: true })
+mkdirSync(output, { recursive: true })
 
-// Host: Node ESM, externalizes DSH packages (resolved at runtime by the loader).
 await build({
   entryPoints: [join(root, 'src/index.ts')],
-  outfile: join(root, 'lib/index.js'),
+  outfile: join(output, 'index.js'),
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node20',
+  target: 'node22',
   sourcemap: true,
   external: [
     '@deepseek-ai/cordis',
+    '@deepseek-ai/dsh-compaction',
+    '@deepseek-ai/dsh-llm',
     '@deepseek-ai/dsh-session',
     '@deepseek-ai/dsh-session-query',
-    '@deepseek-ai/dsh-fs',
-    '@deepseek-ai/dsh-home-paths',
+    '@deepseek-ai/dsh-storage-domain',
   ],
   logLevel: 'info',
 })
 
-// Client: browser bundle, single file (the module table loads it via <script>).
-// The dsh client-module contract: the file must register itself through
-// window.__ModuleLoader__.load with a CJS factory whose `require` is answered
-// by the loader module table (react and other platform modules stay external).
 await build({
   entryPoints: [join(root, 'src/client/index.ts')],
-  outfile: join(root, 'lib/client.js'),
+  outfile: join(output, 'client.js'),
   bundle: true,
   platform: 'browser',
   format: 'cjs',
-  target: 'es2020',
+  target: 'es2022',
   sourcemap: true,
   jsx: 'automatic',
   jsxDev: false,
@@ -49,27 +43,17 @@ await build({
     js: 'window.__ModuleLoader__.load({ id: "dsh-activity-report", factory: (require) => {\n'
       + 'var module = { exports: {} }; var exports = module.exports;',
   },
-  footer: {
-    js: 'return module.exports; } });',
-  },
+  footer: { js: 'return module.exports; } });' },
   logLevel: 'info',
 })
 
-// Type declarations: emit with tsc (best-effort; failure is non-fatal for bundling).
-try {
-  mkdirSync(join(root, 'lib/types'), { recursive: true })
-  execSync('npx tsc --emitDeclarationOnly --declaration --outDir lib/types', {
-    cwd: root,
-    stdio: 'ignore',
-  })
-} catch {
-  // Declaration emission is best-effort; the bundles are the runtime artifact.
-}
+const tsc = join(root, 'node_modules', 'typescript', 'bin', 'tsc')
+execFileSync(process.execPath, [tsc, '-p', join(root, 'tsconfig.build.json')], {
+  cwd: root,
+  stdio: 'inherit',
+})
 
-// Manifest marker so the profile loader can sanity-check the bundle.
 writeFileSync(
-  join(root, 'lib/manifest.json'),
-  JSON.stringify({ name: 'dsh-activity-report', host: 'lib/index.js', client: 'lib/client.js' }, null, 2),
+  join(output, 'manifest.json'),
+  `${JSON.stringify({ name: 'dsh-activity-report', host: 'lib/index.js', client: 'lib/client.js' }, null, 2)}\n`,
 )
-
-console.log('[dsh-activity-report] build complete')

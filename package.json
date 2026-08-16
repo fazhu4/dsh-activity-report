@@ -1,10 +1,24 @@
 {
   "name": "dsh-activity-report",
-  "description": "Web settings panel for DSH activity stats: per-provider / per-model / per-session work activity, token usage and tool calls, aggregated from all local session logs (DeepSeek-portal style).",
-  "version": "0.1.0",
+  "description": "Local, read-only usage, activity, and performance analytics for DeepSeek Harness sessions.",
+  "version": "0.1.0-alpha.0",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "usage-analytics",
+    "token-usage",
+    "local-first"
+  ],
   "exports": {
     ".": {
       "types": "./lib/types/index.d.ts",
@@ -40,12 +54,17 @@
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build"
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "verify:package": "node scripts/verify-package.mjs",
+    "prepack": "pnpm run check"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
     "@deepseek-ai/dsh-session": "*",
     "@deepseek-ai/dsh-session-query": "*",
+    "@deepseek-ai/dsh-storage-domain": "*",
+    "@deepseek-ai/dsh-compaction": "*",
+    "@deepseek-ai/dsh-llm": "*",
     "@deepseek-ai/dsh-client-runtime": "*",
     "@deepseek-ai/dsh-client-ui-slots": "*",
     "@deepseek-ai/dsh-client-ui-settings": "*",
@@ -56,6 +75,9 @@
     "@deepseek-ai/cordis": { "optional": true },
     "@deepseek-ai/dsh-session": { "optional": true },
     "@deepseek-ai/dsh-session-query": { "optional": true },
+    "@deepseek-ai/dsh-storage-domain": { "optional": true },
+    "@deepseek-ai/dsh-compaction": { "optional": true },
+    "@deepseek-ai/dsh-llm": { "optional": true },
     "@deepseek-ai/dsh-client-runtime": { "optional": true },
     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
     "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
@@ -66,20 +88,28 @@
     "@deepseek-ai/cordis": "link:../../deepseek-harness/vendor/cordis",
     "@deepseek-ai/dsh-session": "link:../../deepseek-harness/packages/core/session",
     "@deepseek-ai/dsh-session-query": "link:../../deepseek-harness/packages/session-query/session-query",
-    "@deepseek-ai/dsh-session-query-sqlite": "link:../../deepseek-harness/packages/session-query/session-query-sqlite",
+    "@deepseek-ai/dsh-storage-domain": "link:../../deepseek-harness/packages/storage/storage-domain",
+    "@deepseek-ai/dsh-compaction": "link:../../deepseek-harness/packages/compaction/compaction",
+    "@deepseek-ai/dsh-llm": "link:../../deepseek-harness/packages/llm/llm",
     "@deepseek-ai/dsh-client-runtime": "link:../../deepseek-harness/packages/client/runtime",
     "@deepseek-ai/dsh-client-ui-slots": "link:../../deepseek-harness/packages/client/ui-slots",
     "@deepseek-ai/dsh-client-ui-settings": "link:../../deepseek-harness/packages/client/ui-settings",
     "@deepseek-ai/dsh-client-locale": "link:../../deepseek-harness/packages/client/locale",
-    "@deepseek-ai/dsh-fs": "link:../../deepseek-harness/packages/fs/fs",
-    "@deepseek-ai/dsh-home-paths": "link:../../deepseek-harness/packages/util/home-paths",
     "@types/node": "^24.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "esbuild": "^0.25.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "esbuild": "^0.28.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "jsdom": "^28.1.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "zod": "^4.4.3"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }
