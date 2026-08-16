@@ -75,6 +75,7 @@ export async function apply(ctx: Context & { webServer: WebServerFace }, config:
     status: () => runtime.status(),
     now: () => Date.now(),
     timezone: () => resolved.timezone,
+    retryPersistence: () => runtime.retryPersistence(),
   }, resolved)
   ctx.effect(() => async () => {
     offRoutes()

@@ -52,6 +52,7 @@ export class ActivityRuntime {
   private readonly states = new Map<SessionId, FoldState>()
   private readonly revisions = new Map<SessionId, number>()
   private readonly dirty = new Set<SessionId>()
+  private readonly writeFailures = new Set<SessionId>()
   private readonly buffered = new Map<SessionId, SessionEvent[]>()
   private readonly bufferedHeaders = new Map<SessionId, SessionHeader>()
   private readonly countedSessions = new Set<SessionId>()
@@ -121,8 +122,8 @@ export class ActivityRuntime {
     await Promise.all(workers)
 
     for (const id of [...this.buffered.keys()]) this.drainBuffered(id)
-    this.phase = this.failedSessions === 0 ? 'ready' : 'degraded'
     await this.flush()
+    this.updateOperationalPhase()
   }
 
   /** Accept one post-commit live Session event without awaiting storage. */
@@ -179,16 +180,24 @@ export class ActivityRuntime {
         const snapshot = structuredClone(state.record)
         try {
           await table.put(id, snapshot)
+          this.writeFailures.delete(id)
           if ((this.revisions.get(id) ?? 0) === revision) this.dirty.delete(id)
           this.lastPersistedAt = (this.deps.now ?? Date.now)()
         } catch (error) {
-          this.phase = 'degraded'
+          this.writeFailures.add(id)
           this.deps.onError?.(error, id)
         }
       }
+      if (this.phase !== 'backfilling' && this.phase !== 'disposed') this.updateOperationalPhase()
     }
     this.writeTail = this.writeTail.then(run, run)
     return this.writeTail
+  }
+
+  /** Retry every dirty projection and refresh the observable durability phase. */
+  async retryPersistence(): Promise<void> {
+    await this.flush()
+    if (this.phase !== 'backfilling' && this.phase !== 'disposed') this.updateOperationalPhase()
   }
 
   /** Stop ingestion, drain accepted writes, and close the owned domain. */
@@ -295,5 +304,9 @@ export class ActivityRuntime {
       this.timer = undefined
       void this.flush()
     }, this.config.persistDebounceMs)
+  }
+
+  private updateOperationalPhase(): void {
+    this.phase = this.failedSessions === 0 && this.writeFailures.size === 0 ? 'ready' : 'degraded'
   }
 }

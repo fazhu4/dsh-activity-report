@@ -34,6 +34,28 @@ const emptyPage: BreakdownPage = { dimension: 'model', rows: [] }
 afterEach(cleanup)
 
 describe('activity report client', () => {
+  it('shows degraded durability counts and retries persistence before refresh', async () => {
+    const degraded = summary(10)
+    degraded.status = {
+      phase: 'degraded', processedSessions: 3, totalSessions: 5, failedSessions: 2, dirtyCount: 1,
+    }
+    const retry = vi.fn(async () => degraded.status)
+    const api = {
+      summary: async () => degraded,
+      breakdown: async () => emptyPage,
+      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      retry,
+      exportUrl: () => '#',
+    } satisfies ActivityClient
+
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    expect(await screen.findByText('失败会话: 2')).toBeInTheDocument()
+    expect(screen.getByText('待固化记录: 1')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    await waitFor(() => expect(retry).toHaveBeenCalledOnce())
+  })
+
   it('keeps the newest range result when an older request resolves later', async () => {
     const seven = deferred<ActivitySummaryResponse>()
     const thirty = deferred<ActivitySummaryResponse>()
@@ -41,6 +63,7 @@ describe('activity report client', () => {
       summary: (query) => query.range === '7d' ? seven.promise : query.range === '30d' ? thirty.promise : Promise.resolve(summary(1)),
       breakdown: async () => emptyPage,
       filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
     render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
@@ -67,6 +90,7 @@ describe('activity report client', () => {
       summary: async () => summary(10),
       breakdown: async (query) => query.dimension === 'session' ? page : emptyPage,
       filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
     const openSession = vi.fn()
@@ -85,6 +109,7 @@ describe('activity report client', () => {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
       filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
     render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
@@ -100,6 +125,7 @@ describe('activity report client', () => {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
       filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
     render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
@@ -125,6 +151,7 @@ describe('activity report client', () => {
         return { dimension: 'model', rows: [{ key: 'initial-model', metrics }], nextCursor: 'next' }
       },
       filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
     render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
@@ -147,6 +174,7 @@ describe('activity report client', () => {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
       filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
     render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
@@ -175,6 +203,7 @@ describe('activity report client', () => {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
       filters: async () => ({ workspaces: [], providers: ['deepseek'], models: [], startDay: '2026-08-16', endDay: '2026-08-16' }),
+      retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
     render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)

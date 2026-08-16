@@ -11,7 +11,7 @@ export interface LocaleDict {
   today: string; last7d: string; last30d: string; all: string
   allWorkspaces: string; allProviders: string; allModels: string
   refresh: string; export: string; loading: string; loadError: string; noData: string; notReported: string
-  statusReady: string; statusBackfilling: string; statusDegraded: string; processed: string; persisted: string; localDays: string
+  statusReady: string; statusBackfilling: string; statusDegraded: string; processed: string; failedSessions: string; dirtyRecords: string; persisted: string; localDays: string
   totalTokens: string; requests: string; activeWorkspaces: string; activeSessions: string; usageCoverage: string; cacheReuse: string
   trend: string; tokens: string; reasoningHint: string
   workspace: string; provider: string; model: string; session: string; tool: string
@@ -30,7 +30,7 @@ export const zh: LocaleDict = {
   today: '今天', last7d: '近 7 天', last30d: '近 30 天', all: '全部',
   allWorkspaces: '所有工作区', allProviders: '所有服务商', allModels: '所有模型',
   refresh: '刷新', export: '导出 CSV', loading: '正在更新…', loadError: '加载失败，请重试', noData: '当前筛选没有数据', notReported: '未报告',
-  statusReady: '已就绪', statusBackfilling: '正在回填', statusDegraded: '部分数据不可用', processed: '已处理会话', persisted: '最后固化', localDays: '自然日',
+  statusReady: '已就绪', statusBackfilling: '正在回填', statusDegraded: '部分数据不可用', processed: '已处理会话', failedSessions: '失败会话', dirtyRecords: '待固化记录', persisted: '最后固化', localDays: '自然日',
   totalTokens: '总处理 Token', requests: '已计量请求', activeWorkspaces: '活跃工作区', activeSessions: '活跃会话', usageCoverage: 'Agent Usage 覆盖率', cacheReuse: '缓存复用率',
   trend: '用量趋势', tokens: 'Token', reasoningHint: '推理 Token 已包含在输出中，不重复堆叠。',
   workspace: '工作区', provider: '服务商', model: '模型', session: '会话', tool: '工具',
@@ -50,7 +50,7 @@ export const en: LocaleDict = {
   today: 'Today', last7d: 'Last 7 days', last30d: 'Last 30 days', all: 'All',
   allWorkspaces: 'All workspaces', allProviders: 'All providers', allModels: 'All models',
   refresh: 'Refresh', export: 'Export CSV', loading: 'Updating…', loadError: 'Failed to load. Try again.', noData: 'No data for these filters', notReported: 'Not reported',
-  statusReady: 'Ready', statusBackfilling: 'Backfilling', statusDegraded: 'Partial data', processed: 'Sessions processed', persisted: 'Last persisted', localDays: 'Calendar days',
+  statusReady: 'Ready', statusBackfilling: 'Backfilling', statusDegraded: 'Partial data', processed: 'Sessions processed', failedSessions: 'Failed sessions', dirtyRecords: 'Unpersisted records', persisted: 'Last persisted', localDays: 'Calendar days',
   totalTokens: 'Total processed tokens', requests: 'Metered requests', activeWorkspaces: 'Active workspaces', activeSessions: 'Active sessions', usageCoverage: 'Agent usage coverage', cacheReuse: 'Cache reuse',
   trend: 'Usage trend', tokens: 'Tokens', reasoningHint: 'Reasoning tokens are included in output and are not stacked twice.',
   workspace: 'Workspace', provider: 'Provider', model: 'Model', session: 'Session', tool: 'Tool',

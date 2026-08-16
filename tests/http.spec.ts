@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import { createFoldState, foldEvents } from '../src/fold.ts'
@@ -22,18 +22,19 @@ function source(model = 'summary-model'): ActivityHttpSource {
     }),
     now: () => Date.parse('2026-08-16T01:00:00+08:00'),
     timezone: () => 'Asia/Shanghai',
+    retryPersistence: async () => {},
   }
 }
 
-function harness(model?: string) {
+function harness(model?: string, override: Partial<ActivityHttpSource> = {}) {
   const routes = new Map<string, WebRoute>()
   const dispose = registerActivityRoutes({
     register: (route) => {
       routes.set(route.path, route)
       return () => { routes.delete(route.path) }
     },
-  }, source(model), { defaultPageSize: 25 })
-  async function request(path: string) {
+  }, { ...source(model), ...override }, { defaultPageSize: 25 })
+  async function request(path: string, method = 'GET') {
     const pathname = new URL(path, 'http://localhost').pathname
     const route = routes.get(pathname)
     if (route === undefined) throw new Error(`missing route ${pathname}`)
@@ -44,7 +45,7 @@ function harness(model?: string) {
       writeHead: (nextStatus: number, nextHeaders: Record<string, string>) => { status = nextStatus; headers = nextHeaders },
       end: (chunk?: string) => { body = chunk ?? '' },
     } as unknown as ServerResponse
-    await route.handler({ url: path, method: 'GET' } as IncomingMessage, response)
+    await route.handler({ url: path, method } as IncomingMessage, response)
     return { status, headers, body, json: () => JSON.parse(body) as unknown }
   }
   return { routes, dispose, request }
@@ -96,9 +97,21 @@ describe('activity report HTTP API', () => {
     expect(response.body).toContain("' \t=2+2")
   })
 
-  it('registers and disposes all four exact routes', () => {
+  it('retries dirty persistence through an explicit POST endpoint', async () => {
+    const retryPersistence = vi.fn(async () => {})
+    const api = harness(undefined, { retryPersistence })
+
+    const response = await api.request('/dsh-activity-report/retry', 'POST')
+
+    expect(response.status).toBe(200)
+    expect(response.json()).toMatchObject({ status: { phase: 'ready', dirtyCount: 0 } })
+    expect(retryPersistence).toHaveBeenCalledOnce()
+    expect((await api.request('/dsh-activity-report/retry')).status).toBe(405)
+  })
+
+  it('registers and disposes all five exact routes', () => {
     const api = harness()
-    expect(api.routes.size).toBe(4)
+    expect(api.routes.size).toBe(5)
     api.dispose()
     expect(api.routes.size).toBe(0)
   })

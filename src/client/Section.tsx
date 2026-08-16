@@ -134,6 +134,14 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   )
   const routeFilterActive = provider !== '' || model !== ''
 
+  const retryAndRefresh = (): void => {
+    void api.retry().then(() => {
+      setRefresh((value) => value + 1)
+    }).catch((cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    })
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     void api.filters(controller.signal).then(setOptions).catch((cause: unknown) => {
@@ -243,7 +251,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
       <FilterSelect value={workspace} onChange={setWorkspace} all={t('allWorkspaces')} values={options.workspaces} />
       <FilterSelect value={provider} onChange={setProvider} all={t('allProviders')} values={options.providers} disabled={dimension === 'tool'} />
       <FilterSelect value={model} onChange={setModel} all={t('allModels')} values={options.models} disabled={dimension === 'tool'} />
-      <button type="button" className="dsh_activity_button" onClick={() => setRefresh((value) => value + 1)}>{t('refresh')}</button>
+      <button type="button" className="dsh_activity_button" onClick={retryAndRefresh}>{t('refresh')}</button>
       <a className="dsh_activity_button" href={api.exportUrl(selectedBreakdown)} download>{t('export')}</a>
     </div>
 
@@ -251,6 +259,8 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     {summary !== null && <div className={`dsh_activity_status is-${summary.status.phase}`}>
       <strong>{statusLabel(summary, t)}</strong>
       <span>{t('processed')}: {int(summary.status.processedSessions)} / {int(summary.status.totalSessions)}</span>
+      {summary.status.failedSessions > 0 && <span>{t('failedSessions')}: {int(summary.status.failedSessions)}</span>}
+      {summary.status.dirtyCount > 0 && <span>{t('dirtyRecords')}: {int(summary.status.dirtyCount)}</span>}
       <span>{t('localDays')}: {inclusiveDayRange(summary.startDay, summary.endDayExclusive)}</span>
       {summary.status.lastPersistedAt !== undefined && <span>{t('persisted')}: {new Date(summary.status.lastPersistedAt).toLocaleString()}</span>}
     </div>}

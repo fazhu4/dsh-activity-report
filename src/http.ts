@@ -31,6 +31,7 @@ export interface ActivityHttpSource {
   status(): ActivityRuntimeStatus
   now(): number
   timezone(): string
+  retryPersistence(): Promise<void>
 }
 
 /** HTTP-level defaults that remain configurable by the deployment. */
@@ -218,12 +219,13 @@ function filterOptions(records: readonly SessionRecord[]) {
 }
 
 function handler(
-  endpoint: 'summary' | 'breakdown' | 'filters' | 'export',
+  endpoint: 'summary' | 'breakdown' | 'filters' | 'export' | 'retry',
   source: ActivityHttpSource,
   config: ActivityHttpConfig,
 ): WebRoute['handler'] {
   return async (req, res) => {
-    if (req.method !== 'GET') {
+    const expectedMethod = endpoint === 'retry' ? 'POST' : 'GET'
+    if (req.method !== expectedMethod) {
       json(res, 405, { error: 'method not allowed' })
       return
     }
@@ -231,6 +233,10 @@ function handler(
       const params = new URL(req.url ?? '/', 'http://localhost').searchParams
       const records = source.records()
       switch (endpoint) {
+        case 'retry':
+          await source.retryPersistence()
+          json(res, 200, { status: source.status() })
+          return
         case 'summary':
           json(res, 200, { ...querySummary(records, filters(params, source)), status: source.status() })
           return
@@ -271,6 +277,7 @@ export function registerActivityRoutes(
     ['/dsh-activity-report/breakdown', 'breakdown'],
     ['/dsh-activity-report/filters', 'filters'],
     ['/dsh-activity-report/export.csv', 'export'],
+    ['/dsh-activity-report/retry', 'retry'],
   ]
   const disposers = registrations.map(([path, endpoint]) => webServer.register({
     kind: 'exact',

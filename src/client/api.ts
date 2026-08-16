@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type {
   ActivityFilterOptions,
+  ActivityDataStatus,
   ActivityRange,
   ActivitySummaryResponse,
   BreakdownDimension,
@@ -31,6 +32,7 @@ export interface ActivityClient {
   summary(query: ClientFilters, signal?: AbortSignal): Promise<ActivitySummaryResponse>
   breakdown(query: ClientBreakdownQuery, signal?: AbortSignal): Promise<BreakdownPage>
   filters(signal?: AbortSignal): Promise<ActivityFilterOptions>
+  retry(signal?: AbortSignal): Promise<ActivityDataStatus>
   exportUrl(query: ClientBreakdownQuery): string
 }
 
@@ -51,6 +53,14 @@ const metrics = z.object({
   }).strict(),
 }).strict()
 const group = z.object({ key: z.string(), metrics }).strict()
+const statusSchema = z.object({
+  phase: z.enum(['backfilling', 'ready', 'degraded', 'disposed']),
+  processedSessions: count,
+  totalSessions: count,
+  failedSessions: count,
+  dirtyCount: count,
+  lastPersistedAt: z.number().optional(),
+}).strict()
 const summarySchema = z.object({
   range: z.enum(['today', '7d', '30d', 'all']),
   timezone: z.string().min(1),
@@ -63,14 +73,7 @@ const summarySchema = z.object({
   byOrigin: z.array(group),
   activeSessions: count,
   activeWorkspaces: count,
-  status: z.object({
-    phase: z.enum(['backfilling', 'ready', 'degraded', 'disposed']),
-    processedSessions: count,
-    totalSessions: count,
-    failedSessions: count,
-    dirtyCount: count,
-    lastPersistedAt: z.number().optional(),
-  }).strict(),
+  status: statusSchema,
 }).strict()
 const breakdownSchema = z.object({
   dimension: z.enum(['workspace', 'provider', 'model', 'session', 'tool']),
@@ -128,6 +131,10 @@ export function createActivityClient(fetcher: typeof globalThis.fetch = globalTh
       '/dsh-activity-report/filters',
       { signal },
     ))) as ActivityFilterOptions,
+    retry: async (signal) => {
+      const response = await json(await fetcher('/dsh-activity-report/retry', { method: 'POST', signal }))
+      return statusSchema.parse((response as { status?: unknown }).status) as ActivityDataStatus
+    },
     exportUrl: (query) => `/dsh-activity-report/export.csv?${params(query)}`,
   }
 }

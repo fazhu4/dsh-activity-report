@@ -35,16 +35,29 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function fakeDomain(initial?: SessionRecord): ActivityDomain & { closed: boolean; puts: SessionRecord[]; deletes: SessionId[] } {
+function fakeDomain(initial?: SessionRecord): ActivityDomain & {
+  closed: boolean
+  puts: SessionRecord[]
+  putAttempts: number
+  failNextPuts: number
+  deletes: SessionId[]
+} {
   const records = new Map<SessionId, SessionRecord>()
   if (initial !== undefined) records.set(initial.sessionId, structuredClone(initial))
   const domain = {
     closed: false,
     puts: [] as SessionRecord[],
+    putAttempts: 0,
+    failNextPuts: 0,
     deletes: [] as SessionId[],
     table: () => ({
       entries: () => new Map(records).entries(),
       put: async (id: SessionId, record: SessionRecord) => {
+        domain.putAttempts += 1
+        if (domain.failNextPuts > 0) {
+          domain.failNextPuts -= 1
+          throw new Error('disk temporarily unavailable')
+        }
         const copy = structuredClone(record)
         records.set(id, copy)
         domain.puts.push(copy)
@@ -132,6 +145,33 @@ describe('activity host lifecycle', () => {
 
     expect(domain.puts.at(-1)?.days['1970-01-01']?.totals.usage.requests).toBe(1)
     expect(domain.closed).toBe(true)
+  })
+
+  it('stays degraded after an initial write failure and recovers after explicit retry', async () => {
+    const domain = fakeDomain()
+    domain.failNextPuts = 1
+    const errors: unknown[] = []
+    const runtime = new ActivityRuntime({
+      ...dependencies(domain, async () => ({ session: header(), events: [] })),
+      onError: (error) => { errors.push(error) },
+    }, {
+      persistDebounceMs: 0,
+      backfillConcurrency: 1,
+      timezone: 'Asia/Shanghai',
+    })
+
+    await runtime.start()
+
+    expect(runtime.status()).toMatchObject({ phase: 'degraded', dirtyCount: 1 })
+    expect(domain.putAttempts).toBe(1)
+    expect(errors).toHaveLength(1)
+
+    await runtime.retryPersistence()
+
+    expect(runtime.status()).toMatchObject({ phase: 'ready', dirtyCount: 0 })
+    expect(domain.putAttempts).toBe(2)
+    expect(domain.puts).toHaveLength(1)
+    await runtime.dispose()
   })
 
   it('persists discovered metadata even when the log is empty', async () => {
