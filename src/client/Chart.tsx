@@ -81,7 +81,16 @@ export function UsageChart({ points, labels, mode }: UsageChartProps): JSX.Eleme
                 const height = innerHeight * value / maximum
                 const y = PAD.top + innerHeight - offset - height
                 offset += height
-                return <rect key={key} x={x} y={y} width={barWidth} height={height} fill={COLORS[key]} rx={valueIndex === values.length - 1 ? 2 : 0} />
+                return <rect
+                  key={key}
+                  className={`dsh_activity_chartBar dsh_activity_chartBar_${key}`}
+                  x={x}
+                  y={y}
+                  width={barWidth}
+                  height={height}
+                  fill={COLORS[key]}
+                  rx={valueIndex === values.length - 1 ? 2 : 0}
+                />
               })}
               <rect x={x - 2} y={PAD.top} width={barWidth + 4} height={innerHeight} fill="transparent" />
               {(points.length <= 14 || index % labelEvery === 0) && <text

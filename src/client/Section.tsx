@@ -309,16 +309,34 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
 
     {errors.map((error) => <div key={error} className="dsh_activity_error" role="alert">{t('loadError')}: {error}</div>)}
     {summary === null && loadingSummary ? <div className="dsh_activity_empty">{t('loading')}</div> : totals !== undefined && <>
-      <div className="dsh_activity_cards">
-        <MetricCard label={t('totalTokens')} value={compact(totalTokens(totals.usage))} detail={int(totalTokens(totals.usage))} />
-        <MetricCard label={t('requests')} value={int(totals.usage.requests)} />
-        <MetricCard label={t('activeWorkspaces')} value={int(summary?.activeWorkspaces ?? 0)} />
-        <MetricCard label={t('activeSessions')} value={int(summary?.activeSessions ?? 0)} />
-        <MetricCard label={t('usageCoverage')} value={usageCoverage} />
-        <MetricCard label={t('cacheReuse')} value={cacheReuse} />
+      <div className="dsh_activity_overview">
+        <section className="dsh_activity_kpiFeatured">
+          <div className="dsh_activity_kpiFeaturedTop">
+            <div>
+              <span className="dsh_activity_kpiLabel">{t('totalTokens')}</span>
+              <strong>{compact(totalTokens(totals.usage))}</strong>
+              <small>{int(totalTokens(totals.usage))}</small>
+            </div>
+            <span className="dsh_activity_kpiBadge">{t('tokens')}</span>
+          </div>
+          <div className="dsh_activity_tokenBreakdown">
+            <TokenMetric label={t('input')} value={totals.usage.input} tone="input" />
+            <TokenMetric label={t('cacheRead')} value={totals.usage.cacheRead} tone="cacheRead" />
+            <TokenMetric label={t('cacheWrite')} value={totals.usage.cacheWrite} tone="cacheWrite" />
+            <TokenMetric label={t('output')} value={totals.usage.output} tone="output" />
+          </div>
+          <p className="dsh_activity_kpiHint">{t('reasoningHint')} · {t('reasoning')}: {int(totals.usage.reasoning)}</p>
+        </section>
+        <div className="dsh_activity_kpiGrid">
+          <MetricCard label={t('requests')} value={int(totals.usage.requests)} />
+          <MetricCard label={t('activeWorkspaces')} value={int(summary?.activeWorkspaces ?? 0)} />
+          <MetricCard label={t('activeSessions')} value={int(summary?.activeSessions ?? 0)} />
+          <MetricCard label={t('usageCoverage')} value={usageCoverage} />
+          <MetricCard label={t('cacheReuse')} value={cacheReuse} />
+        </div>
       </div>
 
-      <section className="dsh_activity_panel">
+      <section className="dsh_activity_panel dsh_activity_trendPanel">
         <div className="dsh_activity_panelHeading"><div><h3>{t('trend')}</h3><p>{t('reasoningHint')}</p></div><div className="dsh_activity_toggle">
           <button type="button" aria-pressed={trendMode === 'tokens'} className={trendMode === 'tokens' ? 'is-active' : ''} onClick={() => setTrendMode('tokens')}>{t('trendTokens')}</button>
           <button type="button" aria-pressed={trendMode === 'requests'} className={trendMode === 'requests' ? 'is-active' : ''} onClick={() => setTrendMode('requests')}>{t('trendRequests')}</button>
@@ -393,6 +411,13 @@ function FilterSelect({ value, onChange, all, values, disabled = false }: { valu
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail?: string }): JSX.Element {
   return <div className="dsh_activity_card"><span>{label}</span><strong>{value}</strong>{detail !== undefined && <small>{detail}</small>}</div>
+}
+
+function TokenMetric({ label, value, tone }: { label: string; value: number; tone: 'input' | 'cacheRead' | 'cacheWrite' | 'output' }): JSX.Element {
+  return <div className={`dsh_activity_tokenMetric is-${tone}`}>
+    <span><i aria-hidden="true" />{label}</span>
+    <strong>{compact(value)}</strong>
+  </div>
 }
 
 function sortOptions(dimension: BreakdownDimension): BreakdownSort[] {

@@ -13,6 +13,12 @@ describe('activity stylesheet lifecycle', () => {
     expect(cssText).toContain('.dsh_activity_statusMeta')
   })
 
+  it('defines a featured overview card and a distinct trend panel', () => {
+    expect(cssText).toContain('.dsh_activity_overview')
+    expect(cssText).toContain('.dsh_activity_kpiFeatured')
+    expect(cssText).toContain('.dsh_activity_trendPanel')
+  })
+
   it('removes the shared stylesheet after the final effect releases it', () => {
     const releaseFirst = adoptStyles()
     const releaseSecond = adoptStyles()
