@@ -97,7 +97,7 @@ Agent usage chunk 先到而最终 message 缺失时，样本保留在开放步�
 - “近 7 天”和“近 30 天”分别包含今天在内的 7 个和 30 个本地自然日，不使用滚动的 168/720 小时窗口。
 - “全部”从最早可读事件到当前时间。
 - 所有 API 使用明确的 `startDay` 和排他的 `endDayExclusive`；服务端返回实际时区和边界。
-- Agent 请求用量归入最终有效 usage 样本发生的日期；最终 message 替换早期 chunk 时允许样本迁移日期。压缩摘要用量归入 `compaction/summary` 日期。
+- 最终 message 可以替换同一步的早期 usage chunk；样本只在步骤闭合时进入日期事实。压缩摘要用量归入 `compaction/summary` 日期。
 - 轮次结果归入 `turn/end` 日期；步骤、Agent usage、模型耗时和 TTFT 归入 `step/end` 日期；工具调用、对应结果、失败与耗时统一归入 `tool/call` 日期。
 - 卡片、趋势和明细必须从同一组日期桶聚合，不能按“会话最后活动时间”筛选整段会话总量。
 
