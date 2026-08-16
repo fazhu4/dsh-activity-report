@@ -100,6 +100,20 @@ export interface MetricGroup {
   metrics: Metrics
 }
 
+/** Reported-sample coverage for one metric family. */
+export interface CoverageCount {
+  samples: number
+  total: number
+}
+
+/** Coverage needed to distinguish unavailable measurements from measured zero. */
+export interface ActivityCoverage {
+  agentUsage: CoverageCount
+  modelTiming: CoverageCount
+  ttft: CoverageCount
+  toolTiming: CoverageCount
+}
+
 /** One natural-day point in the usage trend. */
 export interface DailyMetricPoint {
   day: string
@@ -117,6 +131,7 @@ export interface ActivitySummary {
   byProvider: MetricGroup[]
   byModel: MetricGroup[]
   byOrigin: MetricGroup[]
+  coverage: ActivityCoverage
   activeSessions: number
   activeWorkspaces: number
 }
@@ -141,9 +156,19 @@ export interface ActivityFilterOptions {
   workspaces: string[]
   providers: string[]
   models: string[]
-  startDay?: string
-  endDay?: string
 }
+
+/** Context shared by every filtered JSON response. */
+export interface ActivityResponseContext {
+  timezone: string
+  startDay: string
+  endDayExclusive: string
+  status: ActivityDataStatus
+  coverage: ActivityCoverage
+}
+
+/** Scoped filter values with the exact query context that produced them. */
+export interface ActivityFilterResponse extends ActivityFilterOptions, ActivityResponseContext {}
 
 /** Supported analysis-table dimensions. */
 export type BreakdownDimension = 'workspace' | 'provider' | 'model' | 'session' | 'tool'
@@ -164,6 +189,9 @@ export interface BreakdownPage {
   rows: BreakdownRow[]
   nextCursor?: string
 }
+
+/** Breakdown page with the exact query context that produced its rows. */
+export interface BreakdownResponse extends BreakdownPage, ActivityResponseContext {}
 
 /** Inputs for a stable breakdown query. */
 export interface BreakdownQuery extends ActivityFilters {

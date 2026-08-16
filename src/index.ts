@@ -76,6 +76,7 @@ export async function apply(ctx: Context & { webServer: WebServerFace }, config:
     now: () => Date.now(),
     timezone: () => resolved.timezone,
     retryPersistence: () => runtime.retryPersistence(),
+    onError: (error) => { ctx.logger.warn(`dsh-activity-report HTTP: ${String(error)}`) },
   }, resolved)
   ctx.effect(() => async () => {
     offRoutes()

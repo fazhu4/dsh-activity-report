@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import { createFoldState, foldEvents } from '../src/fold.ts'
-import { queryBreakdown, querySummary } from '../src/query.ts'
+import { queryBreakdown, queryFilterOptions, querySummary } from '../src/query.ts'
 import { addMetrics, emptyMetrics, totalTokens } from '../src/metrics.ts'
 import type { Metrics } from '../src/metrics.ts'
 
@@ -74,6 +74,16 @@ describe('reconciled activity queries', () => {
     expect(result.totals.usage.requests).toBe(2)
   })
 
+  it('scopes selector values to the range and active route filters', () => {
+    const options = queryFilterOptions(records, {
+      range: 'today', timezone: 'Asia/Shanghai', now: NOW, providers: ['p1'], models: ['m1'],
+    })
+
+    expect(options.workspaces).toEqual(['G:/alpha'])
+    expect(options.providers).toEqual(['p1', 'p2'])
+    expect(options.models).toEqual(['m1'])
+  })
+
   it('paginates a stable token-descending session list', () => {
     const filters = { range: '7d' as const, timezone: 'Asia/Shanghai', now: NOW }
     const first = queryBreakdown(records, {
@@ -98,6 +108,20 @@ describe('reconciled activity queries', () => {
       ...filters, dimension: 'session', sort: 'requests', direction: 'desc', limit: 1,
       cursor: first.nextCursor,
     })).toThrow(/cursor/i)
+  })
+
+  it('rejects a cursor created for another normalized filter scope', () => {
+    const filters = { range: '7d' as const, timezone: 'Asia/Shanghai', now: NOW }
+    const first = queryBreakdown(records, {
+      ...filters, dimension: 'session', sort: 'tokens', direction: 'desc', limit: 1,
+    })
+
+    expect(() => queryBreakdown(records, {
+      ...filters,
+      workspaces: ['G:/beta'],
+      dimension: 'session', sort: 'tokens', direction: 'desc', limit: 1,
+      cursor: first.nextCursor,
+    })).toThrow('cursor does not match this query')
   })
 
   it('rejects route filters for unattributed tool facts', () => {

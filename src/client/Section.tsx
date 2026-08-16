@@ -144,11 +144,11 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
 
   useEffect(() => {
     const controller = new AbortController()
-    void api.filters(controller.signal).then(setOptions).catch((cause: unknown) => {
+    void api.filters(selectedFilters, controller.signal).then(setOptions).catch((cause: unknown) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
     })
     return () => { controller.abort() }
-  }, [api, refresh])
+  }, [api, selectedFilters, refresh])
 
   useEffect(() => {
     const controller = new AbortController()

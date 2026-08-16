@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ActivitySummaryResponse, BreakdownPage } from '../src/contract.ts'
+import type { ActivityFilterResponse, ActivitySummaryResponse, BreakdownPage, BreakdownResponse } from '../src/contract.ts'
 import { emptyMetrics } from '../src/metrics.ts'
 import type { ActivityClient } from '../src/client/api.ts'
 import { ActivitySection } from '../src/client/Section.tsx'
@@ -18,6 +18,10 @@ function summary(input: number): ActivitySummaryResponse {
     range: 'today', timezone: 'Asia/Shanghai', startDay: '2026-08-16', endDayExclusive: '2026-08-17',
     totals, series: [{ day: '2026-08-16', metrics: totals }], byProvider: [], byModel: [],
     byOrigin: [{ key: 'agent', metrics: totals }], activeSessions: 1, activeWorkspaces: 1,
+    coverage: {
+      agentUsage: { samples: 1, total: 1 }, modelTiming: { samples: 0, total: 1 },
+      ttft: { samples: 0, total: 0 }, toolTiming: { samples: 0, total: 0 },
+    },
     status: { phase: 'ready', processedSessions: 1, totalSessions: 1, failedSessions: 0, dirtyCount: 0 },
   }
 }
@@ -29,7 +33,24 @@ function deferred<T>() {
 }
 
 const t = ((key: keyof typeof zh) => zh[key]) as ActivityT
-const emptyPage: BreakdownPage = { dimension: 'model', rows: [] }
+
+function responseContext() {
+  return {
+    timezone: 'Asia/Shanghai', startDay: '2026-08-16', endDayExclusive: '2026-08-17',
+    status: summary(1).status,
+    coverage: summary(1).coverage,
+  }
+}
+
+function pageResponse(page: BreakdownPage): BreakdownResponse {
+  return { ...page, ...responseContext() }
+}
+
+function filterResponse(values: Pick<ActivityFilterResponse, 'workspaces' | 'providers' | 'models'>): ActivityFilterResponse {
+  return { ...values, ...responseContext() }
+}
+
+const emptyPage: BreakdownResponse = pageResponse({ dimension: 'model', rows: [] })
 
 afterEach(cleanup)
 
@@ -43,7 +64,7 @@ describe('activity report client', () => {
     const api = {
       summary: async () => degraded,
       breakdown: async () => emptyPage,
-      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
       retry,
       exportUrl: () => '#',
     } satisfies ActivityClient
@@ -62,7 +83,7 @@ describe('activity report client', () => {
     const api: ActivityClient = {
       summary: (query) => query.range === '7d' ? seven.promise : query.range === '30d' ? thirty.promise : Promise.resolve(summary(1)),
       breakdown: async () => emptyPage,
-      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
       retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
@@ -80,16 +101,16 @@ describe('activity report client', () => {
   it('opens a session through the injected DSH navigation service', async () => {
     const rowMetrics = emptyMetrics()
     rowMetrics.usage.input = 10
-    const page: BreakdownPage = {
+    const page = pageResponse({
       dimension: 'session',
       rows: [{
         key: 'session-1', sessionId: 'session-1' as SessionId, title: '修复登录错误', cwd: 'G:/project', metrics: rowMetrics,
       }],
-    }
+    })
     const api: ActivityClient = {
       summary: async () => summary(10),
       breakdown: async (query) => query.dimension === 'session' ? page : emptyPage,
-      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
       retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
@@ -108,7 +129,7 @@ describe('activity report client', () => {
     const api: ActivityClient = {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
-      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
       retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
@@ -124,7 +145,7 @@ describe('activity report client', () => {
     const api: ActivityClient = {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
-      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
       retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
@@ -137,20 +158,20 @@ describe('activity report client', () => {
   it('discards pagination that resolves after the analysis query changes', async () => {
     const metrics = emptyMetrics()
     metrics.usage.input = 10
-    const more = deferred<BreakdownPage>()
+    const more = deferred<BreakdownResponse>()
     const api: ActivityClient = {
       summary: async () => summary(10),
       breakdown: async (query) => {
         if (query.cursor !== undefined) return more.promise
         if (query.dimension === 'session') {
-          return {
+          return pageResponse({
             dimension: 'session',
             rows: [{ key: 'session-1', sessionId: 'session-1' as SessionId, title: 'Current session', metrics }],
-          }
+          })
         }
-        return { dimension: 'model', rows: [{ key: 'initial-model', metrics }], nextCursor: 'next' }
+        return pageResponse({ dimension: 'model', rows: [{ key: 'initial-model', metrics }], nextCursor: 'next' })
       },
-      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
       retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
@@ -161,7 +182,7 @@ describe('activity report client', () => {
     fireEvent.click(screen.getByRole('tab', { name: '会话' }))
     await screen.findByRole('button', { name: 'Current session' })
     await act(async () => {
-      more.resolve({ dimension: 'model', rows: [{ key: 'stale-model', metrics }] })
+      more.resolve(pageResponse({ dimension: 'model', rows: [{ key: 'stale-model', metrics }] }))
       await Promise.resolve()
     })
 
@@ -173,7 +194,7 @@ describe('activity report client', () => {
     const api: ActivityClient = {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
-      filters: async () => ({ workspaces: [], providers: [], models: [] }),
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
       retry: async () => summary(1).status,
       exportUrl: () => '#',
     }
@@ -202,7 +223,7 @@ describe('activity report client', () => {
     const api: ActivityClient = {
       summary: async () => summary(10),
       breakdown: async () => emptyPage,
-      filters: async () => ({ workspaces: [], providers: ['deepseek'], models: [], startDay: '2026-08-16', endDay: '2026-08-16' }),
+      filters: async () => filterResponse({ workspaces: [], providers: ['deepseek'], models: [] }),
       retry: async () => summary(1).status,
       exportUrl: () => '#',
     }

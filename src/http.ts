@@ -10,7 +10,7 @@ import type {
 } from './contract.ts'
 import type { ActivityRuntimeStatus } from './host.ts'
 import { dayKey } from './fold.ts'
-import { queryBreakdown, querySummary } from './query.ts'
+import { ActivityQueryError, queryBreakdown, queryFilterOptions, querySummary } from './query.ts'
 import { totalTokens } from './metrics.ts'
 
 /** Web server route registration format used by DSH. */
@@ -32,6 +32,7 @@ export interface ActivityHttpSource {
   now(): number
   timezone(): string
   retryPersistence(): Promise<void>
+  onError?(error: unknown): void
 }
 
 /** HTTP-level defaults that remain configurable by the deployment. */
@@ -169,7 +170,22 @@ function csvRows(dimension: BreakdownDimension, rows: Awaited<ReturnType<typeof 
           ['decode_ms', row => row.metrics.performance.decodeMs],
           ['decode_tokens', row => row.metrics.performance.decodeTokens],
         ]
-      : [
+      : dimension === 'workspace'
+        ? [
+            ['workspace', row => row.key], ...usage,
+            ['turns', row => row.metrics.activity.turns],
+            ['steps', row => row.metrics.activity.steps],
+            ['tool_calls', row => row.metrics.activity.toolCalls],
+            ['tool_results', row => row.metrics.activity.toolResults],
+            ['tool_errors', row => row.metrics.activity.toolErrors],
+            ['model_ms', row => row.metrics.performance.modelMs],
+            ['tool_ms', row => row.metrics.performance.toolMs],
+            ['ttft_ms', row => row.metrics.performance.ttftMs],
+            ['ttft_samples', row => row.metrics.performance.ttftSamples],
+            ['decode_ms', row => row.metrics.performance.decodeMs],
+            ['decode_tokens', row => row.metrics.performance.decodeTokens],
+          ]
+        : [
           [dimension, row => row.key], ...usage,
           ['turns', row => row.metrics.activity.turns],
           ['steps', row => row.metrics.activity.steps],
@@ -192,29 +208,13 @@ function csvRows(dimension: BreakdownDimension, rows: Awaited<ReturnType<typeof 
   return `\uFEFF${lines.join('\r\n')}\r\n`
 }
 
-function filterOptions(records: readonly SessionRecord[]) {
-  const workspaces = new Set<string>()
-  const providers = new Set<string>()
-  const models = new Set<string>()
-  let startDay: string | undefined
-  let endDay: string | undefined
-  for (const record of records) {
-    workspaces.add(record.metadata.cwd ?? '(unknown)')
-    for (const [dayName, day] of Object.entries(record.days)) {
-      if (startDay === undefined || dayName < startDay) startDay = dayName
-      if (endDay === undefined || dayName > endDay) endDay = dayName
-      for (const route of Object.values(day.byRoute)) {
-        providers.add(route.provider)
-        models.add(route.model)
-      }
-    }
-  }
+function context(summary: ReturnType<typeof querySummary>, source: ActivityHttpSource) {
   return {
-    workspaces: [...workspaces].sort(),
-    providers: [...providers].sort(),
-    models: [...models].sort(),
-    startDay,
-    endDay,
+    timezone: summary.timezone,
+    startDay: summary.startDay,
+    endDayExclusive: summary.endDayExclusive,
+    status: source.status(),
+    coverage: summary.coverage,
   }
 }
 
@@ -240,12 +240,18 @@ function handler(
         case 'summary':
           json(res, 200, { ...querySummary(records, filters(params, source)), status: source.status() })
           return
-        case 'breakdown':
-          json(res, 200, queryBreakdown(records, breakdownQuery(params, source, config)))
+        case 'breakdown': {
+          const query = breakdownQuery(params, source, config)
+          const summary = querySummary(records, query)
+          json(res, 200, { ...queryBreakdown(records, query), ...context(summary, source) })
           return
-        case 'filters':
-          json(res, 200, filterOptions(records))
+        }
+        case 'filters': {
+          const query = filters(params, source)
+          const summary = querySummary(records, query)
+          json(res, 200, { ...queryFilterOptions(records, query), ...context(summary, source) })
           return
+        }
         case 'export': {
           const query = breakdownQuery(params, source, config)
           const body = csvRows(query.dimension, await allBreakdownRows(records, query))
@@ -260,8 +266,12 @@ function handler(
         }
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      json(res, 400, { error: message })
+      if (error instanceof RequestError || error instanceof ActivityQueryError) {
+        json(res, 400, { error: error.message })
+        return
+      }
+      source.onError?.(error)
+      json(res, 500, { error: 'internal server error' })
     }
   }
 }

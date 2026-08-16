@@ -60,6 +60,7 @@ describe('activity report HTTP API', () => {
     '/dsh-activity-report/breakdown?dimension=model&cursor=bad',
     '/dsh-activity-report/breakdown?dimension=tool&sort=requests',
     '/dsh-activity-report/breakdown?dimension=tool&provider=deepseek',
+    '/dsh-activity-report/filters?range=year',
   ])('rejects invalid query %s', async (path) => {
     const response = await harness().request(path)
     expect(response.status).toBe(400)
@@ -72,7 +73,26 @@ describe('activity report HTTP API', () => {
     expect(response.json()).toMatchObject({
       timezone: 'Asia/Shanghai', startDay: '2026-08-16', endDayExclusive: '2026-08-17',
       status: { phase: 'ready', lastPersistedAt: 123 },
+      coverage: {
+        agentUsage: { samples: 0, total: 0 },
+        ttft: { samples: 0, total: 0 },
+      },
       totals: { usage: { requests: 1, input: 20, output: 5 } },
+    })
+  })
+
+  it.each([
+    '/dsh-activity-report/breakdown?range=today&dimension=model',
+    '/dsh-activity-report/filters?range=today',
+  ])('returns common response context from %s', async (path) => {
+    const response = await harness().request(path)
+    expect(response.status).toBe(200)
+    expect(response.json()).toMatchObject({
+      timezone: 'Asia/Shanghai',
+      startDay: '2026-08-16',
+      endDayExclusive: '2026-08-17',
+      status: { phase: 'ready' },
+      coverage: { agentUsage: { samples: 0, total: 0 } },
     })
   })
 
@@ -90,6 +110,27 @@ describe('activity report HTTP API', () => {
   it('exports only tool-attributable columns for the tool dimension', async () => {
     const response = await harness().request('/dsh-activity-report/export.csv?range=today&dimension=tool')
     expect(response.body).toBe('\uFEFFtool,tool_calls,tool_results,tool_errors,tool_ms\r\n')
+  })
+
+  it('uses a workspace-specific CSV schema without duplicate workspace columns', async () => {
+    const response = await harness().request('/dsh-activity-report/export.csv?range=today&dimension=workspace')
+    const header = response.body.split('\r\n')[0]?.replace(/^\uFEFF/, '')
+
+    expect(header?.split(',').filter((column) => column === 'workspace')).toHaveLength(1)
+    expect(header).not.toContain(',title,workspace')
+  })
+
+  it('maps unexpected failures to a generic 500 response', async () => {
+    const onError = vi.fn()
+    const response = await harness(undefined, {
+      records: () => { throw new Error('secret storage path') },
+      onError,
+    }).request('/dsh-activity-report/summary?range=today')
+
+    expect(response.status).toBe(500)
+    expect(response.json()).toEqual({ error: 'internal server error' })
+    expect(response.body).not.toContain('secret storage path')
+    expect(onError).toHaveBeenCalledOnce()
   })
 
   it('neutralizes whitespace-prefixed spreadsheet formulas', async () => {

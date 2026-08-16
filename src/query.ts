@@ -1,4 +1,6 @@
 import type {
+  ActivityCoverage,
+  ActivityFilterOptions,
   ActivityFilters,
   ActivitySummary,
   BreakdownPage,
@@ -14,6 +16,9 @@ import { addMetrics, emptyMetrics, isMetricsEmpty, totalTokens } from './metrics
 import { dayKey } from './fold.ts'
 
 const UNKNOWN = '(unknown)'
+
+/** Invalid or stale caller input detected by the activity query layer. */
+export class ActivityQueryError extends Error {}
 
 function copyMetrics(source: Metrics): Metrics {
   const result = emptyMetrics()
@@ -104,6 +109,16 @@ function metricGroups(groups: Map<string, Metrics>): MetricGroup[] {
   return [...groups].map(([key, metrics]) => ({ key, metrics })).sort((left, right) => left.key.localeCompare(right.key))
 }
 
+function coverage(totals: Metrics, origins: readonly MetricGroup[]): ActivityCoverage {
+  const agentSamples = origins.find((group) => group.key === 'agent')?.metrics.usage.requests ?? 0
+  return {
+    agentUsage: { samples: agentSamples, total: totals.activity.steps },
+    modelTiming: { samples: totals.performance.messageSamples, total: totals.activity.steps },
+    ttft: { samples: totals.performance.ttftSamples, total: totals.performance.messageSamples },
+    toolTiming: { samples: totals.activity.toolResults, total: totals.activity.toolCalls },
+  }
+}
+
 /** Aggregate cards, daily series, and route groups from the exact same selected facts. */
 export function querySummary(records: readonly SessionRecord[], filters: ActivityFilters): ActivitySummary {
   const selected = selectedRecords(records, filters)
@@ -147,6 +162,7 @@ export function querySummary(records: readonly SessionRecord[], filters: Activit
     }
   }
 
+  const byOrigin = metricGroups(origins)
   return {
     range: filters.range,
     timezone: filters.timezone,
@@ -156,7 +172,8 @@ export function querySummary(records: readonly SessionRecord[], filters: Activit
     series: [...daily].sort(([left], [right]) => left.localeCompare(right)).map(([day, metrics]) => ({ day, metrics })),
     byProvider: metricGroups(providers),
     byModel: metricGroups(models),
-    byOrigin: metricGroups(origins),
+    byOrigin,
+    coverage: coverage(totals, byOrigin),
     activeSessions: activeSessionIds.size,
     activeWorkspaces: activeWorkspaces.size,
   }
@@ -182,24 +199,42 @@ interface CursorValue {
   direction: BreakdownQuery['direction']
   value: string | number
   key: string
+  scope: string
+}
+
+function normalizedValues(values: readonly string[] | undefined): string[] {
+  return [...new Set(values ?? [])].sort()
+}
+
+function cursorScope(query: BreakdownQuery, bounds: Bounds): string {
+  return JSON.stringify({
+    range: query.range,
+    timezone: query.timezone,
+    startDay: bounds.startDay,
+    endDayExclusive: bounds.endDayExclusive,
+    workspaces: normalizedValues(query.workspaces),
+    providers: normalizedValues(query.providers),
+    models: normalizedValues(query.models),
+    search: query.search?.trim().toLocaleLowerCase() ?? '',
+  })
 }
 
 function encodeCursor(value: CursorValue): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
 }
 
-function decodeCursor(cursor: string, query: BreakdownQuery): CursorValue {
+function decodeCursor(cursor: string, query: BreakdownQuery, scope: string): CursorValue {
   let value: unknown
   try {
     value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
   } catch {
-    throw new Error('invalid cursor encoding')
+    throw new ActivityQueryError('invalid cursor encoding')
   }
-  if (typeof value !== 'object' || value === null) throw new Error('invalid cursor value')
+  if (typeof value !== 'object' || value === null) throw new ActivityQueryError('invalid cursor value')
   const candidate = value as Partial<CursorValue>
-  if (candidate.dimension !== query.dimension || candidate.sort !== query.sort || candidate.direction !== query.direction
+  if (candidate.dimension !== query.dimension || candidate.sort !== query.sort || candidate.direction !== query.direction || candidate.scope !== scope
     || (typeof candidate.value !== 'number' && typeof candidate.value !== 'string') || typeof candidate.key !== 'string') {
-    throw new Error('cursor does not match this query')
+    throw new ActivityQueryError('cursor does not match this query')
   }
   return candidate as CursorValue
 }
@@ -246,11 +281,12 @@ function collectRows(records: readonly SessionRecord[], query: BreakdownQuery, b
 
 /** Return one stable cursor-paginated analysis table. */
 export function queryBreakdown(records: readonly SessionRecord[], query: BreakdownQuery): BreakdownPage {
-  if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 200) throw new Error('limit must be between 1 and 200')
+  if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 200) throw new ActivityQueryError('limit must be between 1 and 200')
   if (query.dimension === 'tool' && hasRouteFilter(query)) {
-    throw new Error('provider and model filters are not supported for the tool dimension')
+    throw new ActivityQueryError('provider and model filters are not supported for the tool dimension')
   }
   const bounds = resolveBounds(records, query)
+  const scope = cursorScope(query, bounds)
   const search = query.search?.trim().toLocaleLowerCase()
   const rows = collectRows(records, query, bounds)
     .filter((row) => search === undefined || search === '' || `${row.key} ${row.title ?? ''} ${row.cwd ?? ''}`.toLocaleLowerCase().includes(search))
@@ -263,9 +299,9 @@ export function queryBreakdown(records: readonly SessionRecord[], query: Breakdo
 
   let start = 0
   if (query.cursor !== undefined) {
-    const cursor = decodeCursor(query.cursor, query)
+    const cursor = decodeCursor(query.cursor, query, scope)
     const index = rows.findIndex((row) => row.key === cursor.key && sortValue(row, query.sort) === cursor.value)
-    if (index < 0) throw new Error('cursor row is no longer available')
+    if (index < 0) throw new ActivityQueryError('cursor row is no longer available')
     start = index + 1
   }
   const pageRows = rows.slice(start, start + query.limit)
@@ -277,11 +313,40 @@ export function queryBreakdown(records: readonly SessionRecord[], query: Breakdo
         direction: query.direction,
         value: sortValue(last, query.sort),
         key: last.key,
+        scope,
       })
     : undefined
   return {
     dimension: query.dimension,
     rows: pageRows,
     ...(nextCursor === undefined ? {} : { nextCursor }),
+  }
+}
+
+/** Return range- and filter-scoped values for the browser selectors. */
+export function queryFilterOptions(records: readonly SessionRecord[], filters: ActivityFilters): ActivityFilterOptions {
+  const summary = querySummary(records, filters)
+  const bounds = { startDay: summary.startDay, endDayExclusive: summary.endDayExclusive }
+  const workspaces = new Set<string>()
+  const providers = new Set<string>()
+  const models = new Set<string>()
+  const routeFilters: ActivityFilters = { ...filters, workspaces: undefined }
+
+  for (const record of records) {
+    const workspaceSelected = includes(filters.workspaces, workspace(record))
+    for (const [dayName, day] of Object.entries(record.days)) {
+      if (!inBounds(dayName, bounds)) continue
+      if (!isMetricsEmpty(selectedDayMetrics(day, routeFilters))) workspaces.add(workspace(record))
+      if (!workspaceSelected) continue
+      for (const route of Object.values(day.byRoute)) {
+        if (includes(filters.models, route.model)) providers.add(route.provider)
+        if (includes(filters.providers, route.provider)) models.add(route.model)
+      }
+    }
+  }
+  return {
+    workspaces: [...workspaces].sort(),
+    providers: [...providers].sort(),
+    models: [...models].sort(),
   }
 }

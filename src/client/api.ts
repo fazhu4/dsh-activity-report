@@ -1,11 +1,11 @@
 import { z } from 'zod'
 import type {
-  ActivityFilterOptions,
   ActivityDataStatus,
+  ActivityFilterResponse,
   ActivityRange,
   ActivitySummaryResponse,
   BreakdownDimension,
-  BreakdownPage,
+  BreakdownResponse,
   BreakdownSort,
 } from '../contract.ts'
 
@@ -30,8 +30,8 @@ export interface ClientBreakdownQuery extends ClientFilters {
 /** Abortable validated API used by the settings section. */
 export interface ActivityClient {
   summary(query: ClientFilters, signal?: AbortSignal): Promise<ActivitySummaryResponse>
-  breakdown(query: ClientBreakdownQuery, signal?: AbortSignal): Promise<BreakdownPage>
-  filters(signal?: AbortSignal): Promise<ActivityFilterOptions>
+  breakdown(query: ClientBreakdownQuery, signal?: AbortSignal): Promise<BreakdownResponse>
+  filters(query: ClientFilters, signal?: AbortSignal): Promise<ActivityFilterResponse>
   retry(signal?: AbortSignal): Promise<ActivityDataStatus>
   exportUrl(query: ClientBreakdownQuery): string
 }
@@ -53,6 +53,12 @@ const metrics = z.object({
   }).strict(),
 }).strict()
 const group = z.object({ key: z.string(), metrics }).strict()
+const coverageSchema = z.object({
+  agentUsage: z.object({ samples: count, total: count }).strict(),
+  modelTiming: z.object({ samples: count, total: count }).strict(),
+  ttft: z.object({ samples: count, total: count }).strict(),
+  toolTiming: z.object({ samples: count, total: count }).strict(),
+}).strict()
 const statusSchema = z.object({
   phase: z.enum(['backfilling', 'ready', 'degraded', 'disposed']),
   processedSessions: count,
@@ -71,6 +77,7 @@ const summarySchema = z.object({
   byProvider: z.array(group),
   byModel: z.array(group),
   byOrigin: z.array(group),
+  coverage: coverageSchema,
   activeSessions: count,
   activeWorkspaces: count,
   status: statusSchema,
@@ -85,13 +92,21 @@ const breakdownSchema = z.object({
     cwd: z.string().optional(),
   }).strict()),
   nextCursor: z.string().optional(),
+  timezone: z.string().min(1),
+  startDay: z.string(),
+  endDayExclusive: z.string(),
+  status: statusSchema,
+  coverage: coverageSchema,
 }).strict()
 const filtersSchema = z.object({
   workspaces: z.array(z.string()),
   providers: z.array(z.string()),
   models: z.array(z.string()),
-  startDay: z.string().optional(),
-  endDay: z.string().optional(),
+  timezone: z.string().min(1),
+  startDay: z.string(),
+  endDayExclusive: z.string(),
+  status: statusSchema,
+  coverage: coverageSchema,
 }).strict()
 
 function params(query: ClientFilters & Partial<ClientBreakdownQuery>): URLSearchParams {
@@ -126,11 +141,11 @@ export function createActivityClient(fetcher: typeof globalThis.fetch = globalTh
     breakdown: async (query, signal) => breakdownSchema.parse(await json(await fetcher(
       `/dsh-activity-report/breakdown?${params(query)}`,
       { signal },
-    ))) as BreakdownPage,
-    filters: async (signal) => filtersSchema.parse(await json(await fetcher(
-      '/dsh-activity-report/filters',
+    ))) as BreakdownResponse,
+    filters: async (query, signal) => filtersSchema.parse(await json(await fetcher(
+      `/dsh-activity-report/filters?${params(query)}`,
       { signal },
-    ))) as ActivityFilterOptions,
+    ))) as ActivityFilterResponse,
     retry: async (signal) => {
       const response = await json(await fetcher('/dsh-activity-report/retry', { method: 'POST', signal }))
       return statusSchema.parse((response as { status?: unknown }).status) as ActivityDataStatus
