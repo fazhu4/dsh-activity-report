@@ -23,6 +23,7 @@ export function int(n: number): string {
 /** Duration in ms → human string: 94_000 → "1m 34s", 3_700_000 → "1h 1m". */
 export function duration(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return '0s'
+  if (ms < 1_000) return `${Math.round(ms)}ms`
   const s = Math.round(ms / 1000)
   if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)

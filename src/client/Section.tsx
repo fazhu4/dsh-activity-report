@@ -119,7 +119,11 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const [refresh, setRefresh] = useState(0)
   const [loadingSummary, setLoadingSummary] = useState(true)
   const [loadingRows, setLoadingRows] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [filterError, setFilterError] = useState<string | null>(null)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [breakdownError, setBreakdownError] = useState<string | null>(null)
+  const [paginationError, setPaginationError] = useState<string | null>(null)
+  const [retryError, setRetryError] = useState<string | null>(null)
   const summaryRequest = useRef(0)
   const breakdownRequest = useRef(0)
   const paginationController = useRef<AbortController | null>(null)
@@ -136,16 +140,22 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
 
   const retryAndRefresh = (): void => {
     void api.retry().then(() => {
+      setRetryError(null)
       setRefresh((value) => value + 1)
     }).catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setRetryError(cause instanceof Error ? cause.message : String(cause))
     })
   }
 
   useEffect(() => {
     const controller = new AbortController()
-    void api.filters(selectedFilters, controller.signal).then(setOptions).catch((cause: unknown) => {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
+    void api.filters(selectedFilters, controller.signal).then((value) => {
+      if (!controller.signal.aborted) {
+        setOptions(value)
+        setFilterError(null)
+      }
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted) setFilterError(cause instanceof Error ? cause.message : String(cause))
     })
     return () => { controller.abort() }
   }, [api, selectedFilters, refresh])
@@ -157,11 +167,11 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     void api.summary(selectedFilters, controller.signal).then((value) => {
       if (!controller.signal.aborted && request === summaryRequest.current) {
         setSummary(value)
-        setError(null)
+        setSummaryError(null)
       }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted && request === summaryRequest.current) {
-        setError(cause instanceof Error ? cause.message : String(cause))
+        setSummaryError(cause instanceof Error ? cause.message : String(cause))
       }
     }).finally(() => {
       if (!controller.signal.aborted && request === summaryRequest.current) setLoadingSummary(false)
@@ -176,11 +186,12 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     void api.breakdown(selectedBreakdown, controller.signal).then((value) => {
       if (!controller.signal.aborted && request === breakdownRequest.current) {
         setPage(value)
-        setError(null)
+        setBreakdownError(null)
+        setPaginationError(null)
       }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted && request === breakdownRequest.current) {
-        setError(cause instanceof Error ? cause.message : String(cause))
+        setBreakdownError(cause instanceof Error ? cause.message : String(cause))
       }
     }).finally(() => {
       if (!controller.signal.aborted && request === breakdownRequest.current) setLoadingRows(false)
@@ -206,13 +217,14 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     paginationController.current = controller
     const request = breakdownRequest.current
     setLoadingRows(true)
+    setPaginationError(null)
     void api.breakdown({ ...selectedBreakdown, cursor: page.nextCursor }, controller.signal).then((next) => {
       if (!controller.signal.aborted && request === breakdownRequest.current) {
         setPage({ ...next, rows: [...page.rows, ...next.rows] })
       }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted && request === breakdownRequest.current) {
-        setError(cause instanceof Error ? cause.message : String(cause))
+        setPaginationError(cause instanceof Error ? cause.message : String(cause))
       }
     }).finally(() => {
       if (!controller.signal.aborted && request === breakdownRequest.current) setLoadingRows(false)
@@ -225,6 +237,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const usageCoverage = totals !== undefined && totals.activity.steps > 0 ? percent(agentRequests, totals.activity.steps) : t('notReported')
   const promptTokens = totals === undefined ? 0 : totalInputTokens(totals.usage)
   const cacheReuse = promptTokens > 0 && totals !== undefined ? percent(totals.usage.cacheRead, promptTokens) : t('notReported')
+  const errors = [...new Set([filterError, summaryError, breakdownError, paginationError, retryError].filter((value): value is string => value !== null))]
 
   return <div className="dsh_activity_section">
     <header className="dsh_activity_heading">
@@ -265,7 +278,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
       {summary.status.lastPersistedAt !== undefined && <span>{t('persisted')}: {new Date(summary.status.lastPersistedAt).toLocaleString()}</span>}
     </div>}
 
-    {error !== null && <div className="dsh_activity_error" role="alert">{t('loadError')}: {error}</div>}
+    {errors.map((error) => <div key={error} className="dsh_activity_error" role="alert">{t('loadError')}: {error}</div>)}
     {summary === null && loadingSummary ? <div className="dsh_activity_empty">{t('loading')}</div> : totals !== undefined && <>
       <div className="dsh_activity_cards">
         <MetricCard label={t('totalTokens')} value={compact(totalTokens(totals.usage))} detail={int(totalTokens(totals.usage))} />
@@ -397,7 +410,7 @@ function MetricCells({ metrics, providerLike, t }: { metrics: Metrics; providerL
   return <>
     <td>{int(metrics.usage.requests)}</td><td>{int(metrics.usage.input)}</td><td>{int(metrics.usage.cacheRead)}</td><td>{int(metrics.usage.cacheWrite)}</td><td>{int(metrics.usage.output)}</td><td>{int(totalTokens(metrics.usage))}</td>
     {!providerLike && <><td>{int(metrics.activity.turns)}</td><td>{int(metrics.activity.steps)}</td><td>{int(metrics.activity.toolCalls)}</td><td>{int(metrics.activity.toolErrors)}</td></>}
-    <td>{duration(metrics.performance.modelMs)}</td>{!providerLike && <td>{duration(metrics.performance.toolMs)}</td>}<td>{ttft}</td><td>{speed}</td>
+    <td>{metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)}</td>{!providerLike && <td>{metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)}</td>}<td>{ttft}</td><td>{speed}</td>
   </>
 }
 
@@ -406,7 +419,7 @@ function ToolCells({ metrics, t }: { metrics: Metrics; t: ActivityT }): JSX.Elem
   return <>
     <td>{int(metrics.activity.toolCalls)}</td><td>{int(returned)}</td><td>{int(metrics.activity.toolErrors)}</td>
     <td>{returned === 0 ? t('notReported') : percent(metrics.activity.toolErrors, returned)}</td>
-    <td>{duration(metrics.performance.toolMs)}</td><td>{returned === 0 ? t('notReported') : duration(metrics.performance.toolMs / returned)}</td>
+    <td>{returned === 0 ? t('notReported') : duration(metrics.performance.toolMs)}</td><td>{returned === 0 ? t('notReported') : duration(metrics.performance.toolMs / returned)}</td>
   </>
 }
 
@@ -417,8 +430,8 @@ function Performance({ metrics, t }: { metrics: Metrics; t: ActivityT }): JSX.El
     <div className="dsh_activity_performance">
       <MetricCard label={t('avgTtft')} value={ttft} />
       <MetricCard label={t('outputSpeed')} value={speed} />
-      <MetricCard label={t('modelTime')} value={duration(metrics.performance.modelMs)} />
-      <MetricCard label={t('toolTime')} value={duration(metrics.performance.toolMs)} />
+      <MetricCard label={t('modelTime')} value={metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)} />
+      <MetricCard label={t('toolTime')} value={metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)} />
     </div>
     {Object.keys(metrics.activity.outcomes).length > 0 && <div className="dsh_activity_outcomes"><strong>{t('outcomes')}</strong>{Object.entries(metrics.activity.outcomes).map(([key, value]) => <span key={key}>{key}: {int(value)}</span>)}</div>}
   </section>

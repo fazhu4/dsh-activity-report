@@ -1,0 +1,20 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from 'vitest'
+import { adoptStyles } from '../src/client/styles.ts'
+
+afterEach(() => {
+  document.getElementById('dsh-activity-report-styles')?.remove()
+})
+
+describe('activity stylesheet lifecycle', () => {
+  it('removes the shared stylesheet after the final effect releases it', () => {
+    const releaseFirst = adoptStyles()
+    const releaseSecond = adoptStyles()
+
+    expect(document.querySelectorAll('#dsh-activity-report-styles')).toHaveLength(1)
+    releaseFirst()
+    expect(document.querySelectorAll('#dsh-activity-report-styles')).toHaveLength(1)
+    releaseSecond()
+    expect(document.querySelectorAll('#dsh-activity-report-styles')).toHaveLength(0)
+  })
+})

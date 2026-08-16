@@ -55,6 +55,47 @@ const emptyPage: BreakdownResponse = pageResponse({ dimension: 'model', rows: []
 afterEach(cleanup)
 
 describe('activity report client', () => {
+  it('keeps a filter failure visible when summary and breakdown requests succeed', async () => {
+    const nextSummary = deferred<ActivitySummaryResponse>()
+    const nextPage = deferred<BreakdownResponse>()
+    const api: ActivityClient = {
+      summary: async () => nextSummary.promise,
+      breakdown: async () => nextPage.promise,
+      filters: async () => { throw new Error('filter request failed') },
+      retry: async () => summary(1).status,
+      exportUrl: () => '#',
+    }
+
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('filter request failed')
+    await act(async () => {
+      nextSummary.resolve(summary(10))
+      nextPage.resolve(emptyPage)
+      await Promise.resolve()
+    })
+    expect(screen.getByText('总处理 Token')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('filter request failed')
+  })
+
+  it('renders missing timing samples as unavailable instead of zero', async () => {
+    const api: ActivityClient = {
+      summary: async () => summary(10),
+      breakdown: async () => emptyPage,
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
+      retry: async () => summary(1).status,
+      exportUrl: () => '#',
+    }
+
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    await screen.findByText('性能与结果')
+    const modelTime = screen.getAllByText('模型耗时').find((node) => node.tagName === 'SPAN')
+    const toolTime = screen.getAllByText('工具耗时').find((node) => node.tagName === 'SPAN')
+    expect(modelTime?.parentElement).toHaveTextContent('未报告')
+    expect(toolTime?.parentElement).toHaveTextContent('未报告')
+  })
+
   it('shows degraded durability counts and retries persistence before refresh', async () => {
     const degraded = summary(10)
     degraded.status = {
