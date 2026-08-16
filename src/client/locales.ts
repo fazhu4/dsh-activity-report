@@ -15,6 +15,7 @@ export interface LocaleDict {
   totalTokens: string; requests: string; activeWorkspaces: string; activeSessions: string; usageCoverage: string; cacheReuse: string
   trend: string; tokens: string; reasoningHint: string; trendTokens: string; trendRequests: string
   workspace: string; provider: string; model: string; session: string; tool: string
+  analysis: string; analysisHint: string; rows: string
   search: string; sort: string; descending: string; ascending: string; loadMore: string
   input: string; cacheRead: string; cacheWrite: string; output: string; reasoning: string
   turns: string; steps: string; calls: string; results: string; errors: string; agentRequests: string; compactionRequests: string
@@ -35,6 +36,7 @@ export const zh: LocaleDict = {
   totalTokens: '总处理 Token', requests: '已计量请求', activeWorkspaces: '活跃工作区', activeSessions: '活跃会话', usageCoverage: 'Agent Usage 覆盖率', cacheReuse: '缓存复用率',
   trend: '用量趋势', tokens: 'Token', reasoningHint: '推理 Token 已包含在输出中，不重复堆叠。', trendTokens: 'Token', trendRequests: '请求',
   workspace: '工作区', provider: '服务商', model: '模型', session: '会话', tool: '工具',
+  analysis: '用量明细', analysisHint: '按维度查看筛选范围内的 Token、请求和性能数据。', rows: '条结果',
   search: '搜索当前维度', sort: '排序', descending: '降序', ascending: '升序', loadMore: '加载更多',
   input: '未缓存输入', cacheRead: '缓存读取', cacheWrite: '缓存写入', output: '输出', reasoning: '其中推理',
   turns: '轮次', steps: '步骤', calls: '调用', results: '已返回', errors: '失败', agentRequests: 'Agent 请求', compactionRequests: 'Compaction 请求',
@@ -56,6 +58,7 @@ export const en: LocaleDict = {
   totalTokens: 'Total processed tokens', requests: 'Metered requests', activeWorkspaces: 'Active workspaces', activeSessions: 'Active sessions', usageCoverage: 'Agent usage coverage', cacheReuse: 'Cache reuse',
   trend: 'Usage trend', tokens: 'Tokens', reasoningHint: 'Reasoning tokens are included in output and are not stacked twice.', trendTokens: 'Tokens', trendRequests: 'Requests',
   workspace: 'Workspace', provider: 'Provider', model: 'Model', session: 'Session', tool: 'Tool',
+  analysis: 'Usage details', analysisHint: 'Review token, request, and performance data by dimension.', rows: 'rows',
   search: 'Search this dimension', sort: 'Sort', descending: 'Descending', ascending: 'Ascending', loadMore: 'Load more',
   input: 'Uncached input', cacheRead: 'Cache read', cacheWrite: 'Cache write', output: 'Output', reasoning: 'Reasoning subset',
   turns: 'Turns', steps: 'Steps', calls: 'Calls', results: 'Returned', errors: 'Errors', agentRequests: 'Agent requests', compactionRequests: 'Compaction requests',

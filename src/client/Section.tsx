@@ -308,7 +308,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
     </div>}
 
     {errors.map((error) => <div key={error} className="dsh_activity_error" role="alert">{t('loadError')}: {error}</div>)}
-    {summary === null && loadingSummary ? <div className="dsh_activity_empty">{t('loading')}</div> : totals !== undefined && <>
+    {summary === null && loadingSummary ? <div className="dsh_activity_empty dsh_activity_emptyState">{t('loading')}</div> : totals !== undefined && <>
       <div className="dsh_activity_overview">
         <section className="dsh_activity_kpiFeatured">
           <div className="dsh_activity_kpiFeaturedTop">
@@ -348,8 +348,12 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
         }} />
       </section>
 
-      <section className="dsh_activity_panel">
-        <div className="dsh_activity_dimensionTabs" role="tablist" aria-label={t('sort')}>
+      <section className="dsh_activity_panel dsh_activity_metricPanel">
+        <div className="dsh_activity_analysisHeader">
+          <div><h3>{t('analysis')}</h3><p>{t('analysisHint')}</p></div>
+          <span className="dsh_activity_analysisCount">{page?.rows.length ?? 0} {t('rows')}</span>
+        </div>
+        <div className="dsh_activity_dimensionTabs" role="tablist" aria-label={t('analysis')}>
           {dimensions.map((item) => <button
             key={item.id}
             type="button"
@@ -372,7 +376,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
           >{t(item.key)}</button>)}
         </div>
         {routeFilterActive && <p className="dsh_activity_privacy">{t('toolFilterHint')}</p>}
-        <div role="tabpanel" id="dsh_activity_dimension_panel" aria-labelledby={`dsh_activity_dimension_tab_${dimension}`}>
+        <div role="tabpanel" id="dsh_activity_dimension_panel" aria-labelledby={`dsh_activity_dimension_tab_${dimension}`} aria-busy={loadingRows}>
         <div className="dsh_activity_tableTools">
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('search')} aria-label={t('search')} />
           <select value={sort} onChange={(event) => setSort(event.target.value as BreakdownSort)} aria-label={t('sort')}>
@@ -388,8 +392,8 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
           openSession={(id) => { close(); openSession(id) }}
           t={t}
         />
-        {loadingRows && <div className="dsh_activity_loadingOverlay">{t('loading')}</div>}
-        {!loadingRows && (page?.rows.length ?? 0) === 0 && <div className="dsh_activity_empty">{t('noData')}</div>}
+        {loadingRows && <div className="dsh_activity_loadingOverlay dsh_activity_loadingState"><span aria-hidden="true" />{t('loading')}</div>}
+        {!loadingRows && (page?.rows.length ?? 0) === 0 && <div className="dsh_activity_empty dsh_activity_emptyState">{t('noData')}</div>}
         {page?.nextCursor !== undefined && <button type="button" className="dsh_activity_more" onClick={loadMore}>{t('loadMore')}</button>}
         </div>
       </section>
@@ -496,7 +500,7 @@ function Performance({ metrics, coverage, t }: { metrics: Metrics; coverage: Act
   const modelTimingCoverage = coverage.modelTiming.total === 0 ? t('notReported') : percent(coverage.modelTiming.samples, coverage.modelTiming.total)
   const toolTimingCoverage = coverage.toolTiming.total === 0 ? t('notReported') : percent(coverage.toolTiming.samples, coverage.toolTiming.total)
   const speed = metrics.performance.decodeMs === 0 || metrics.performance.decodeTokens === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)} ${t('tokens')}/s`
-  return <section className="dsh_activity_panel"><h3>{t('performance')}</h3>
+  return <section className="dsh_activity_panel dsh_activity_metricPanel"><div className="dsh_activity_analysisHeader"><div><h3>{t('performance')}</h3><p>{t('analysisHint')}</p></div></div>
     <div className="dsh_activity_performance">
       <MetricCard label={t('avgTtft')} value={ttft} />
       <MetricCard label={t('ttftCoverage')} value={ttftCoverage} detail={`${int(coverage.ttft.samples)} / ${int(coverage.ttft.total)}`} />
@@ -513,7 +517,7 @@ function Performance({ metrics, coverage, t }: { metrics: Metrics; coverage: Act
 function ReliabilityTrend({ points, t }: { points: ActivitySummaryResponse['series']; t: ActivityT }): JSX.Element {
   const observed = points.filter((point) => point.metrics.activity.toolResults > 0 || point.metrics.activity.toolCalls > 0)
   if (observed.length === 0) return <></>
-  return <section className="dsh_activity_panel">
+  return <section className="dsh_activity_panel dsh_activity_metricPanel">
     <div className="dsh_activity_panelHeading"><div><h3>{t('toolFailureTrend')}</h3><p>{t('toolFailureHint')}</p></div></div>
     <div className="dsh_activity_reliability">{observed.map((point) => {
       const returned = point.metrics.activity.toolResults

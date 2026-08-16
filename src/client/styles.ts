@@ -187,6 +187,11 @@ export const cssText = `
 .dsh_activity_legend i { width: 10px; height: 10px; border-radius: 2px; }
 
 .dsh_activity_dimensionTabs { display: flex; gap: 20px; margin: -2px 0 14px; overflow-x: auto; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.dsh_activity_analysisHeader { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.dsh_activity_analysisHeader h3 { margin: 0; }
+.dsh_activity_analysisHeader p { margin: 4px 0 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+.dsh_activity_analysisCount { flex: 0 0 auto; padding: 4px 8px; border-radius: 6px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-tertiary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.dsh_activity_metricPanel { padding-bottom: 15px; }
 .dsh_activity_dimensionTabs button { padding: 8px 2px 9px; border-bottom: 2px solid transparent; white-space: nowrap; }
 .dsh_activity_dimensionTabs button.is-active { border-bottom-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary); font-weight: 650; }
 .dsh_activity_tableTools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -203,6 +208,9 @@ export const cssText = `
 .dsh_activity_sessionButton:hover { text-decoration: underline; }
 
 .dsh_activity_loadingOverlay { padding: 10px; color: var(--dsw-alias-label-tertiary); text-align: center; }
+.dsh_activity_loadingState { display: flex; justify-content: center; align-items: center; gap: 8px; }
+.dsh_activity_loadingState span { width: 12px; height: 12px; border: 2px solid var(--dsw-alias-border-l2); border-top-color: var(--dsw-alias-brand-primary); border-radius: 50%; animation: dsh_activity_spin 700ms linear infinite; }
+.dsh_activity_emptyState { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 90px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: 9px; background: var(--dsw-alias-bg-layer-2); }
 .dsh_activity_more { display: block; margin: 12px auto 0; border: 0; background: transparent; color: var(--dsw-alias-brand-primary); cursor: pointer; font: inherit; }
 .dsh_activity_empty { padding: 30px; color: var(--dsw-alias-label-tertiary); text-align: center; }
 .dsh_activity_error { padding: 10px 12px; border: 1px solid var(--dsw-alias-state-error-secondary); border-radius: 8px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-error-primary); }
@@ -216,6 +224,7 @@ export const cssText = `
 .dsh_activity_reliability > div > div { height: 7px; overflow: hidden; border-radius: 4px; background: var(--dsw-alias-bg-layer-3); }
 .dsh_activity_reliability i { display: block; height: 100%; background: var(--dsw-alias-state-error-primary); }
 .dsh_activity_reliability strong { font-weight: 550; text-align: right; }
+@keyframes dsh_activity_spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 760px) {
   .dsh_activity_hero { flex-direction: column; gap: 10px; }
@@ -237,7 +246,12 @@ export const cssText = `
   .dsh_activity_panelHeading { flex-direction: column; }
   .dsh_activity_toggle { align-self: stretch; }
   .dsh_activity_toggle button { flex: 1; }
-  .dsh_activity_tooltip { position: static; margin: 8px 0; }
+   .dsh_activity_tooltip { position: static; margin: 8px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dsh_activity_chartBar,
+  .dsh_activity_loadingState span { transition: none; animation: none; }
 }
 `
 

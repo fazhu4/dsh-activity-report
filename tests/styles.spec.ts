@@ -19,6 +19,12 @@ describe('activity stylesheet lifecycle', () => {
     expect(cssText).toContain('.dsh_activity_trendPanel')
   })
 
+  it('defines analysis, metric, and empty-state presentation layers', () => {
+    expect(cssText).toContain('.dsh_activity_analysisHeader')
+    expect(cssText).toContain('.dsh_activity_metricPanel')
+    expect(cssText).toContain('.dsh_activity_emptyState')
+  })
+
   it('removes the shared stylesheet after the final effect releases it', () => {
     const releaseFirst = adoptStyles()
     const releaseSecond = adoptStyles()
