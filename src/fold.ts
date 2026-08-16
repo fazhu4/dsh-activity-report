@@ -240,6 +240,9 @@ export function foldEvent(state: FoldState, event: SessionEvent, timeZone?: stri
       break
     }
     case 'tool-call': {
+      const seenToolCalls = record.runtime.seenToolCalls ??= {}
+      if (seenToolCalls[adapted.callId] === true) break
+      seenToolCalls[adapted.callId] = true
       record.runtime.pendingTools[adapted.callId] = { name: adapted.name, startTime: adapted.time }
       const metrics = emptyMetrics()
       metrics.activity.toolCalls = 1

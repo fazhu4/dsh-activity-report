@@ -81,6 +81,7 @@ const sessionRecordSchema = z.object({
     }).strict().optional(),
     lastCountedTurn: z.number().int().nonnegative().nullable(),
     pendingTools: z.record(z.string(), z.object({ name: z.string(), startTime: z.number() }).strict()),
+    seenToolCalls: z.record(z.string(), z.literal(true)).optional(),
   }).strict(),
   days: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), dayFactsSchema),
 }).strict() as unknown as z.ZodType<SessionRecord>
@@ -101,7 +102,7 @@ export function createSessionRecord(sessionId: SessionId, metadata: SessionMetad
     ...(timezone === undefined ? {} : { timezone }),
     watermark: -1,
     metadata: { ...metadata },
-    runtime: { lastCountedTurn: null, pendingTools: {} },
+    runtime: { lastCountedTurn: null, pendingTools: {}, seenToolCalls: {} },
     days: {},
   }
 }

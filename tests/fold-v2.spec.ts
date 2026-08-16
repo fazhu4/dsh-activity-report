@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-compaction/types'
 import { activityReportDomainSpec } from '../src/domain.ts'
-import { createFoldState, foldEvents } from '../src/fold.ts'
+import { createFoldState, foldEvents, hydrateFoldState } from '../src/fold.ts'
 import { totalTokens } from '../src/metrics.ts'
 
 const SESSION_ID = 'session-1' as SessionId
@@ -125,6 +125,26 @@ describe('session activity fold', () => {
 
     expect(state.record.days[DAY_1]?.totals.activity).toMatchObject({ toolCalls: 1, toolResults: 1, toolErrors: 1 })
     expect(state.record.days[DAY_1]?.byTool.bash?.performance.toolMs).toBe(60)
+  })
+
+  it('does not recount or retime a repeated tool call id after hydration', () => {
+    const first = createFoldState(SESSION_ID)
+    foldEvents(first, [
+      event(0, 100, 'tool/call', { turn: 1, step: 1, callId: 'call-1', name: 'bash', arguments: '{}' }),
+    ])
+    const resumed = hydrateFoldState(first.record)
+
+    foldEvents(resumed, [
+      event(1, 150, 'tool/call', { turn: 1, step: 1, callId: 'call-1', name: 'bash', arguments: '{}' }),
+      event(2, 200, 'tool/result', {
+        turn: 1,
+        step: 1,
+        message: { source: { callId: 'call-1' } },
+      }),
+    ])
+
+    expect(resumed.record.days[DAY_1]?.totals.activity).toMatchObject({ toolCalls: 1, toolResults: 1 })
+    expect(resumed.record.days[DAY_1]?.byTool.bash?.performance.toolMs).toBe(100)
   })
 
   it('ignores replayed events at or below the watermark', () => {

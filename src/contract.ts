@@ -59,6 +59,8 @@ export interface RuntimeFoldState {
   openUsage?: UsageSample
   lastCountedTurn: number | null
   pendingTools: Record<string, PendingTool>
+  /** Tool call IDs already counted, including calls completed before restart. */
+  seenToolCalls?: Record<string, true>
 }
 
 /** Metadata displayed for one local Session. */
