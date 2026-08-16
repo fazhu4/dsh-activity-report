@@ -99,6 +99,17 @@ describe('reconciled activity queries', () => {
     expect(totalTokens(first.rows[0]!.metrics.usage)).toBeGreaterThanOrEqual(totalTokens(second.rows[0]!.metrics.usage))
   })
 
+  it('preserves request-origin aggregates in model rows', () => {
+    const page = queryBreakdown(records, {
+      range: '7d', timezone: 'Asia/Shanghai', now: NOW,
+      dimension: 'model', sort: 'tokens', direction: 'desc', limit: 25,
+    })
+    const model = page.rows.find((row) => row.key === 'm1')
+
+    expect(model?.byOrigin?.find((group) => group.key === 'agent')?.metrics.usage.requests).toBe(2)
+    expect(model?.metrics.activity.steps).toBe(2)
+  })
+
   it('rejects a cursor created for another sort', () => {
     const filters = { range: 'all' as const, timezone: 'Asia/Shanghai', now: NOW }
     const first = queryBreakdown(records, {

@@ -241,11 +241,26 @@ function decodeCursor(cursor: string, query: BreakdownQuery, scope: string): Cur
 
 function collectRows(records: readonly SessionRecord[], query: BreakdownQuery, bounds: Bounds): BreakdownRow[] {
   const rows = new Map<string, BreakdownRow>()
+  const rowOrigins = new Map<string, Map<string, Metrics>>()
   const selected = selectedRecords(records, query)
   const rowAt = (key: string, fields: Omit<BreakdownRow, 'key' | 'metrics'> = {}): BreakdownRow => {
     const row = rows.get(key) ?? { key, metrics: emptyMetrics(), ...fields }
     rows.set(key, row)
     return row
+  }
+  const addOrigins = (key: string, origins: Partial<Record<RequestOrigin, Metrics>>): void => {
+    const target = rowOrigins.get(key) ?? new Map<string, Metrics>()
+    for (const [origin, metrics] of Object.entries(origins) as Array<[RequestOrigin, Metrics]>) {
+      addGroup(target, origin, metrics)
+    }
+    rowOrigins.set(key, target)
+  }
+  const addSelectedOrigins = (key: string, day: DayFacts): void => {
+    if (!hasRouteFilter(query)) {
+      addOrigins(key, day.byOrigin)
+      return
+    }
+    for (const route of matchingRoutes(day, query)) addOrigins(key, route.byOrigin)
   }
 
   for (const record of selected) {
@@ -254,6 +269,7 @@ function collectRows(records: readonly SessionRecord[], query: BreakdownQuery, b
       switch (query.dimension) {
         case 'workspace':
           addMetrics(rowAt(workspace(record)).metrics, selectedDayMetrics(day, query))
+          addSelectedOrigins(workspace(record), day)
           break
         case 'session':
           addMetrics(rowAt(record.sessionId, {
@@ -261,12 +277,19 @@ function collectRows(records: readonly SessionRecord[], query: BreakdownQuery, b
             ...(record.metadata.title === undefined ? {} : { title: record.metadata.title }),
             ...(record.metadata.cwd === undefined ? {} : { cwd: record.metadata.cwd }),
           }).metrics, selectedDayMetrics(day, query))
+          addSelectedOrigins(record.sessionId, day)
           break
         case 'provider':
-          for (const route of matchingRoutes(day, query)) addMetrics(rowAt(route.provider).metrics, route.metrics)
+          for (const route of matchingRoutes(day, query)) {
+            addMetrics(rowAt(route.provider).metrics, route.metrics)
+            addOrigins(route.provider, route.byOrigin)
+          }
           break
         case 'model':
-          for (const route of matchingRoutes(day, query)) addMetrics(rowAt(route.model).metrics, route.metrics)
+          for (const route of matchingRoutes(day, query)) {
+            addMetrics(rowAt(route.model).metrics, route.metrics)
+            addOrigins(route.model, route.byOrigin)
+          }
           break
         case 'tool':
           if (!hasRouteFilter(query)) {
@@ -276,7 +299,10 @@ function collectRows(records: readonly SessionRecord[], query: BreakdownQuery, b
       }
     }
   }
-  return [...rows.values()].filter((row) => !isMetricsEmpty(row.metrics))
+  return [...rows.values()].filter((row) => !isMetricsEmpty(row.metrics)).map((row) => ({
+    ...row,
+    byOrigin: metricGroups(rowOrigins.get(row.key) ?? new Map()),
+  }))
 }
 
 /** Return one stable cursor-paginated analysis table. */

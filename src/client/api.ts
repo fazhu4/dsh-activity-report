@@ -87,6 +87,7 @@ const breakdownSchema = z.object({
   rows: z.array(z.object({
     key: z.string(),
     metrics,
+    byOrigin: z.array(group).optional(),
     sessionId: z.string().optional(),
     title: z.string().optional(),
     cwd: z.string().optional(),

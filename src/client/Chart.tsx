@@ -11,11 +11,13 @@ export interface UsageChartLabels {
   output: string
   reasoning: string
   tokens: string
+  requests: string
 }
 
 export interface UsageChartProps {
   points: DailyMetricPoint[]
   labels: UsageChartLabels
+  mode: 'tokens' | 'requests'
 }
 
 const WIDTH = 960
@@ -26,14 +28,15 @@ const COLORS = {
   cacheRead: '#55b89a',
   cacheWrite: '#d69b44',
   output: '#a475e8',
+  requests: '#6c8cff',
 }
 
 /** Accessible stacked natural-day usage chart with hover and keyboard detail. */
-export function UsageChart({ points, labels }: UsageChartProps): JSX.Element {
+export function UsageChart({ points, labels, mode }: UsageChartProps): JSX.Element {
   const [active, setActive] = useState<number | null>(null)
   const innerWidth = WIDTH - PAD.left - PAD.right
   const innerHeight = HEIGHT - PAD.top - PAD.bottom
-  const maximum = Math.max(1, ...points.map((point) => totalTokens(point.metrics.usage)))
+  const maximum = Math.max(1, ...points.map((point) => mode === 'requests' ? point.metrics.usage.requests : totalTokens(point.metrics.usage)))
   const slot = innerWidth / Math.max(1, points.length)
   const barWidth = Math.max(3, Math.min(34, slot * 0.68))
   const ticks = 4
@@ -52,16 +55,18 @@ export function UsageChart({ points, labels }: UsageChartProps): JSX.Element {
             </g>
           })}
           {points.map((point, index) => {
-            const values = [
-              ['input', point.metrics.usage.input],
-              ['cacheRead', point.metrics.usage.cacheRead],
-              ['cacheWrite', point.metrics.usage.cacheWrite],
-              ['output', point.metrics.usage.output],
-            ] as const
+            const values: Array<[keyof typeof COLORS, number, string]> = mode === 'requests'
+              ? [['requests', point.metrics.usage.requests, labels.requests]]
+              : [
+                  ['input', point.metrics.usage.input, labels.input],
+                  ['cacheRead', point.metrics.usage.cacheRead, labels.cacheRead],
+                  ['cacheWrite', point.metrics.usage.cacheWrite, labels.cacheWrite],
+                  ['output', point.metrics.usage.output, labels.output],
+                ]
             const x = PAD.left + slot * index + (slot - barWidth) / 2
             let offset = 0
             const labelEvery = Math.max(1, Math.ceil(points.length / 14))
-            const description = `${point.day}, ${labels.input} ${int(values[0][1])}, ${labels.cacheRead} ${int(values[1][1])}, ${labels.cacheWrite} ${int(values[2][1])}, ${labels.output} ${int(values[3][1])}`
+            const description = `${point.day}, ${values.map(([, value, label]) => `${label} ${int(value)}`).join(', ')}`
             return <g
               key={point.day}
               tabIndex={0}
@@ -72,11 +77,11 @@ export function UsageChart({ points, labels }: UsageChartProps): JSX.Element {
               onMouseEnter={() => setActive(index)}
               onMouseLeave={() => setActive(null)}
             >
-              {values.map(([key, value]) => {
+              {values.map(([key, value], valueIndex) => {
                 const height = innerHeight * value / maximum
                 const y = PAD.top + innerHeight - offset - height
                 offset += height
-                return <rect key={key} x={x} y={y} width={barWidth} height={height} fill={COLORS[key]} rx={key === 'output' ? 2 : 0} />
+                return <rect key={key} x={x} y={y} width={barWidth} height={height} fill={COLORS[key]} rx={valueIndex === values.length - 1 ? 2 : 0} />
               })}
               <rect x={x - 2} y={PAD.top} width={barWidth + 4} height={innerHeight} fill="transparent" />
               {(points.length <= 14 || index % labelEvery === 0) && <text
@@ -91,16 +96,21 @@ export function UsageChart({ points, labels }: UsageChartProps): JSX.Element {
       </div>
       {selected !== undefined && <div className="dsh_activity_tooltip" role="status">
         <strong>{selected.day}</strong>
-        <span>{labels.input}: {int(selected.metrics.usage.input)}</span>
-        <span>{labels.cacheRead}: {int(selected.metrics.usage.cacheRead)}</span>
-        <span>{labels.cacheWrite}: {int(selected.metrics.usage.cacheWrite)}</span>
-        <span>{labels.output}: {int(selected.metrics.usage.output)}</span>
-        <span>{labels.reasoning}: {int(selected.metrics.usage.reasoning)}</span>
+        {mode === 'requests'
+          ? <span>{labels.requests}: {int(selected.metrics.usage.requests)}</span>
+          : <>
+              <span>{labels.input}: {int(selected.metrics.usage.input)}</span>
+              <span>{labels.cacheRead}: {int(selected.metrics.usage.cacheRead)}</span>
+              <span>{labels.cacheWrite}: {int(selected.metrics.usage.cacheWrite)}</span>
+              <span>{labels.output}: {int(selected.metrics.usage.output)}</span>
+              <span>{labels.reasoning}: {int(selected.metrics.usage.reasoning)}</span>
+            </>}
       </div>}
-      <div className="dsh_activity_legend" aria-label={labels.tokens}>
-        {([
-          ['input', labels.input], ['cacheRead', labels.cacheRead], ['cacheWrite', labels.cacheWrite], ['output', labels.output],
-        ] as const).map(([key, label]) => <span key={key}><i style={{ background: COLORS[key] }} />{label}</span>)}
+      <div className="dsh_activity_legend" aria-label={mode === 'requests' ? labels.requests : labels.tokens}>
+        {(mode === 'requests'
+          ? [['requests', labels.requests]] as const
+          : [['input', labels.input], ['cacheRead', labels.cacheRead], ['cacheWrite', labels.cacheWrite], ['output', labels.output]] as const
+        ).map(([key, label]) => <span key={key}><i style={{ background: COLORS[key] }} />{label}</span>)}
       </div>
     </div>
   )

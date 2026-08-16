@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
+  ActivityCoverage,
   ActivityFilterOptions,
   ActivityRange,
   ActivitySummaryResponse,
@@ -116,6 +117,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const [direction, setDirection] = useState<'asc' | 'desc'>('desc')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState<BreakdownPage | null>(null)
+  const [trendMode, setTrendMode] = useState<'tokens' | 'requests'>('tokens')
   const [refresh, setRefresh] = useState(0)
   const [loadingSummary, setLoadingSummary] = useState(true)
   const [loadingRows, setLoadingRows] = useState(true)
@@ -233,8 +235,9 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   }
 
   const totals = summary?.totals
-  const agentRequests = summary?.byOrigin.find((item) => item.key === 'agent')?.metrics.usage.requests ?? 0
-  const usageCoverage = totals !== undefined && totals.activity.steps > 0 ? percent(agentRequests, totals.activity.steps) : t('notReported')
+  const usageCoverage = summary !== null && summary.coverage.agentUsage.total > 0
+    ? percent(summary.coverage.agentUsage.samples, summary.coverage.agentUsage.total)
+    : t('notReported')
   const promptTokens = totals === undefined ? 0 : totalInputTokens(totals.usage)
   const cacheReuse = promptTokens > 0 && totals !== undefined ? percent(totals.usage.cacheRead, promptTokens) : t('notReported')
   const errors = [...new Set([filterError, summaryError, breakdownError, paginationError, retryError].filter((value): value is string => value !== null))]
@@ -290,10 +293,14 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
       </div>
 
       <section className="dsh_activity_panel">
-        <div className="dsh_activity_panelHeading"><div><h3>{t('trend')}</h3><p>{t('reasoningHint')}</p></div>{loadingSummary && <span>{t('loading')}</span>}</div>
-        <UsageChart points={summary?.series ?? []} labels={{
+        <div className="dsh_activity_panelHeading"><div><h3>{t('trend')}</h3><p>{t('reasoningHint')}</p></div><div className="dsh_activity_toggle">
+          <button type="button" aria-pressed={trendMode === 'tokens'} className={trendMode === 'tokens' ? 'is-active' : ''} onClick={() => setTrendMode('tokens')}>{t('trendTokens')}</button>
+          <button type="button" aria-pressed={trendMode === 'requests'} className={trendMode === 'requests' ? 'is-active' : ''} onClick={() => setTrendMode('requests')}>{t('trendRequests')}</button>
+          {loadingSummary && <span>{t('loading')}</span>}
+        </div></div>
+        <UsageChart mode={trendMode} points={summary?.series ?? []} labels={{
           chart: t('trend'), input: t('input'), cacheRead: t('cacheRead'), cacheWrite: t('cacheWrite'),
-          output: t('output'), reasoning: t('reasoning'), tokens: t('tokens'),
+          output: t('output'), reasoning: t('reasoning'), tokens: t('tokens'), requests: t('trendRequests'),
         }} />
       </section>
 
@@ -343,7 +350,8 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
         </div>
       </section>
 
-      <Performance metrics={totals} t={t} />
+      <Performance metrics={totals} coverage={summary!.coverage} t={t} />
+      <ReliabilityTrend points={summary!.series} t={t} />
       <details className="dsh_activity_notes"><summary>{t('metricNotes')}</summary><p>{t('metricNotesBody')}</p></details>
     </>}
     </div>
@@ -390,27 +398,33 @@ function BreakdownTable({ dimension, rows, openSession, t }: {
       {tool ? <>
         <th>{t('calls')}</th><th>{t('results')}</th><th>{t('errors')}</th><th>{t('errorRate')}</th><th>{t('toolTime')}</th><th>{t('average')}</th>
       </> : <>
-        <th>{t('requests')}</th><th>{t('input')}</th><th>{t('cacheRead')}</th><th>{t('cacheWrite')}</th><th>{t('output')}</th><th>{t('tokens')}</th>
-        {!providerLike && <><th>{t('turns')}</th><th>{t('steps')}</th><th>{t('calls')}</th><th>{t('errors')}</th></>}
-        <th>{t('modelTime')}</th>{!providerLike && <th>{t('toolTime')}</th>}<th>{t('avgTtft')}</th><th>{t('outputSpeed')}</th>
+        <th>{t('requests')}</th>{providerLike && <><th>{t('agentRequests')}</th><th>{t('compactionRequests')}</th><th>{t('usageCoverage')}</th></>}<th>{t('input')}</th><th>{t('cacheRead')}</th><th>{t('cacheWrite')}</th><th>{t('output')}</th><th>{t('tokens')}</th>
+        {!providerLike && <><th>{t('turns')}</th><th>{t('steps')}</th><th>{t('calls')}</th><th>{t('errors')}</th><th>{t('outcomes')}</th></>}
+        <th>{t('modelTime')}</th>{!providerLike && <th>{t('toolTime')}</th>}<th>{t('avgTtft')}</th><th>{t('ttftCoverage')}</th><th>{t('outputSpeed')}</th>
       </>}
     </tr></thead>
     <tbody>{rows.map((row) => <tr key={row.key}>
       <td>{dimension === 'session' && row.sessionId !== undefined
         ? <button type="button" className="dsh_activity_sessionButton" onClick={() => openSession(row.sessionId!)}>{row.title ?? row.key}</button>
         : row.key}{row.cwd !== undefined && <small>{row.cwd}</small>}</td>
-      {tool ? <ToolCells metrics={row.metrics} t={t} /> : <MetricCells metrics={row.metrics} providerLike={providerLike} t={t} />}
+      {tool ? <ToolCells metrics={row.metrics} t={t} /> : <MetricCells row={row} providerLike={providerLike} t={t} />}
     </tr>)}</tbody>
   </table></div>
 }
 
-function MetricCells({ metrics, providerLike, t }: { metrics: Metrics; providerLike: boolean; t: ActivityT }): JSX.Element {
+function MetricCells({ row, providerLike, t }: { row: BreakdownRow; providerLike: boolean; t: ActivityT }): JSX.Element {
+  const { metrics } = row
+  const agentRequests = row.byOrigin?.find((group) => group.key === 'agent')?.metrics.usage.requests ?? 0
+  const compactionRequests = row.byOrigin?.find((group) => group.key === 'compaction')?.metrics.usage.requests ?? 0
+  const agentCoverage = metrics.activity.steps === 0 ? t('notReported') : percent(agentRequests, metrics.activity.steps)
   const ttft = metrics.performance.ttftSamples === 0 ? t('notReported') : duration(metrics.performance.ttftMs / metrics.performance.ttftSamples)
-  const speed = metrics.performance.decodeMs === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)}/s`
+  const ttftCoverage = metrics.performance.messageSamples === 0 ? t('notReported') : percent(metrics.performance.ttftSamples, metrics.performance.messageSamples)
+  const speed = metrics.performance.decodeMs === 0 || metrics.performance.decodeTokens === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)}/s`
+  const outcomes = Object.entries(metrics.activity.outcomes).map(([key, value]) => `${key}: ${int(value)}`).join(', ')
   return <>
-    <td>{int(metrics.usage.requests)}</td><td>{int(metrics.usage.input)}</td><td>{int(metrics.usage.cacheRead)}</td><td>{int(metrics.usage.cacheWrite)}</td><td>{int(metrics.usage.output)}</td><td>{int(totalTokens(metrics.usage))}</td>
-    {!providerLike && <><td>{int(metrics.activity.turns)}</td><td>{int(metrics.activity.steps)}</td><td>{int(metrics.activity.toolCalls)}</td><td>{int(metrics.activity.toolErrors)}</td></>}
-    <td>{metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)}</td>{!providerLike && <td>{metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)}</td>}<td>{ttft}</td><td>{speed}</td>
+    <td>{int(metrics.usage.requests)}</td>{providerLike && <><td>{int(agentRequests)}</td><td>{int(compactionRequests)}</td><td>{agentCoverage}</td></>}<td>{int(metrics.usage.input)}</td><td>{int(metrics.usage.cacheRead)}</td><td>{int(metrics.usage.cacheWrite)}</td><td>{int(metrics.usage.output)}</td><td>{int(totalTokens(metrics.usage))}</td>
+    {!providerLike && <><td>{int(metrics.activity.turns)}</td><td>{int(metrics.activity.steps)}</td><td>{int(metrics.activity.toolCalls)}</td><td>{int(metrics.activity.toolErrors)}</td><td>{outcomes === '' ? t('notReported') : outcomes}</td></>}
+    <td>{metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)}</td>{!providerLike && <td>{metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)}</td>}<td>{ttft}</td><td>{ttftCoverage}</td><td>{speed}</td>
   </>
 }
 
@@ -423,16 +437,35 @@ function ToolCells({ metrics, t }: { metrics: Metrics; t: ActivityT }): JSX.Elem
   </>
 }
 
-function Performance({ metrics, t }: { metrics: Metrics; t: ActivityT }): JSX.Element {
+function Performance({ metrics, coverage, t }: { metrics: Metrics; coverage: ActivityCoverage; t: ActivityT }): JSX.Element {
   const ttft = metrics.performance.ttftSamples === 0 ? t('notReported') : duration(metrics.performance.ttftMs / metrics.performance.ttftSamples)
-  const speed = metrics.performance.decodeMs === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)} ${t('tokens')}/s`
+  const ttftCoverage = coverage.ttft.total === 0 ? t('notReported') : percent(coverage.ttft.samples, coverage.ttft.total)
+  const speed = metrics.performance.decodeMs === 0 || metrics.performance.decodeTokens === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)} ${t('tokens')}/s`
   return <section className="dsh_activity_panel"><h3>{t('performance')}</h3>
     <div className="dsh_activity_performance">
       <MetricCard label={t('avgTtft')} value={ttft} />
+      <MetricCard label={t('ttftCoverage')} value={ttftCoverage} detail={`${int(coverage.ttft.samples)} / ${int(coverage.ttft.total)}`} />
       <MetricCard label={t('outputSpeed')} value={speed} />
       <MetricCard label={t('modelTime')} value={metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)} />
       <MetricCard label={t('toolTime')} value={metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)} />
     </div>
     {Object.keys(metrics.activity.outcomes).length > 0 && <div className="dsh_activity_outcomes"><strong>{t('outcomes')}</strong>{Object.entries(metrics.activity.outcomes).map(([key, value]) => <span key={key}>{key}: {int(value)}</span>)}</div>}
+  </section>
+}
+
+function ReliabilityTrend({ points, t }: { points: ActivitySummaryResponse['series']; t: ActivityT }): JSX.Element {
+  const observed = points.filter((point) => point.metrics.activity.toolResults > 0 || point.metrics.activity.toolCalls > 0)
+  if (observed.length === 0) return <></>
+  return <section className="dsh_activity_panel">
+    <div className="dsh_activity_panelHeading"><div><h3>{t('toolFailureTrend')}</h3><p>{t('toolFailureHint')}</p></div></div>
+    <div className="dsh_activity_reliability">{observed.map((point) => {
+      const returned = point.metrics.activity.toolResults
+      const errors = point.metrics.activity.toolErrors
+      return <div key={point.day}>
+        <span>{point.day}</span>
+        <div><i style={{ width: returned === 0 ? '0%' : `${Math.min(100, errors / returned * 100)}%` }} /></div>
+        <strong>{int(errors)} / {int(returned)}</strong>
+      </div>
+    })}</div>
   </section>
 }

@@ -144,6 +144,8 @@ async function allBreakdownRows(
 
 function csvRows(dimension: BreakdownDimension, rows: Awaited<ReturnType<typeof allBreakdownRows>>): string {
   type Column = readonly [header: string, value: (row: BreakdownRow) => string | number]
+  const originRequests = (row: BreakdownRow, origin: 'agent' | 'compaction'): number =>
+    row.byOrigin?.find((group) => group.key === origin)?.metrics.usage.requests ?? 0
   const usage: Column[] = [
     ['requests', row => row.metrics.usage.requests],
     ['input', row => row.metrics.usage.input],
@@ -163,7 +165,13 @@ function csvRows(dimension: BreakdownDimension, rows: Awaited<ReturnType<typeof 
       ]
     : dimension === 'provider' || dimension === 'model'
       ? [
-          [dimension, row => row.key], ...usage,
+          [dimension, row => row.key],
+          ['requests', row => row.metrics.usage.requests],
+          ['agent_requests', row => originRequests(row, 'agent')],
+          ['compaction_requests', row => originRequests(row, 'compaction')],
+          ['steps', row => row.metrics.activity.steps],
+          ['message_samples', row => row.metrics.performance.messageSamples],
+          ...usage.slice(1),
           ['model_ms', row => row.metrics.performance.modelMs],
           ['ttft_ms', row => row.metrics.performance.ttftMs],
           ['ttft_samples', row => row.metrics.performance.ttftSamples],

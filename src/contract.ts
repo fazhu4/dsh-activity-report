@@ -178,6 +178,7 @@ export type BreakdownSort = 'key' | 'tokens' | 'requests' | 'turns' | 'steps' | 
 
 /** One dimension row; session rows include navigation metadata. */
 export interface BreakdownRow extends MetricGroup {
+  byOrigin?: MetricGroup[]
   sessionId?: SessionId
   title?: string
   cwd?: string

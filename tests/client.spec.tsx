@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ActivityFilterResponse, ActivitySummaryResponse, BreakdownPage, BreakdownResponse } from '../src/contract.ts'
@@ -94,6 +94,74 @@ describe('activity report client', () => {
     const toolTime = screen.getAllByText('工具耗时').find((node) => node.tagName === 'SPAN')
     expect(modelTime?.parentElement).toHaveTextContent('未报告')
     expect(toolTime?.parentElement).toHaveTextContent('未报告')
+  })
+
+  it('switches to request trend and shows TTFT and tool-failure coverage', async () => {
+    const data = summary(10)
+    data.coverage.ttft = { samples: 1, total: 2 }
+    data.totals.performance.messageSamples = 2
+    data.totals.performance.ttftSamples = 1
+    data.totals.activity.toolCalls = 2
+    data.totals.activity.toolResults = 2
+    data.totals.activity.toolErrors = 1
+    data.series[0]!.metrics.activity.toolCalls = 2
+    data.series[0]!.metrics.activity.toolResults = 2
+    data.series[0]!.metrics.activity.toolErrors = 1
+    const api: ActivityClient = {
+      summary: async () => data,
+      breakdown: async () => emptyPage,
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
+      retry: async () => data.status,
+      exportUrl: () => '#',
+    }
+
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    await screen.findByText('总处理 Token')
+    expect(screen.getByText('TTFT 覆盖率').parentElement).toHaveTextContent('50.0%')
+    fireEvent.click(screen.getByRole('button', { name: '请求' }))
+    expect(screen.getByRole('graphics-symbol')).toHaveAccessibleName(/请求 1/)
+    expect(screen.getByText('工具失败趋势')).toBeInTheDocument()
+    expect(screen.getAllByText('1 / 2')).toHaveLength(2)
+  })
+
+  it('shows request origins, row coverage, and outcomes in analysis tables', async () => {
+    const rowMetrics = emptyMetrics()
+    rowMetrics.usage.requests = 2
+    rowMetrics.activity.steps = 2
+    rowMetrics.performance.messageSamples = 2
+    rowMetrics.performance.ttftSamples = 1
+    rowMetrics.activity.outcomes.completed = 2
+    const agent = emptyMetrics()
+    agent.usage.requests = 1
+    const compaction = emptyMetrics()
+    compaction.usage.requests = 1
+    const modelPage = pageResponse({
+      dimension: 'model',
+      rows: [{ key: 'model-x', metrics: rowMetrics, byOrigin: [{ key: 'agent', metrics: agent }, { key: 'compaction', metrics: compaction }] }],
+    })
+    const workspacePage = pageResponse({
+      dimension: 'workspace', rows: [{ key: 'G:/project', metrics: rowMetrics, byOrigin: [{ key: 'agent', metrics: agent }] }],
+    })
+    const api: ActivityClient = {
+      summary: async () => summary(10),
+      breakdown: async (query) => query.dimension === 'workspace' ? workspacePage : modelPage,
+      filters: async () => filterResponse({ workspaces: ['G:/project'], providers: [], models: [] }),
+      retry: async () => summary(1).status,
+      exportUrl: () => '#',
+    }
+
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    await screen.findByText('model-x')
+    const modelTable = screen.getByRole('table')
+    expect(within(modelTable).getByText('Agent 请求')).toBeInTheDocument()
+    expect(within(modelTable).getByText('Compaction 请求')).toBeInTheDocument()
+    expect(within(modelTable).getAllByText('50.0%')).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('tab', { name: '工作区' }))
+    await screen.findByText('G:/project')
+    expect(within(screen.getByRole('table')).getByText('completed: 2')).toBeInTheDocument()
   })
 
   it('shows degraded durability counts and retries persistence before refresh', async () => {
