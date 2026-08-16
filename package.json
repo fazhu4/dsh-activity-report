@@ -3,14 +3,6 @@
   "description": "Local, read-only usage, activity, and performance analytics for DeepSeek Harness sessions.",
   "version": "0.1.0-alpha.0",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/fazhu4/dsh-activity-report.git"
-  },
-  "bugs": {
-    "url": "https://github.com/fazhu4/dsh-activity-report/issues"
-  },
-  "homepage": "https://github.com/fazhu4/dsh-activity-report#readme",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

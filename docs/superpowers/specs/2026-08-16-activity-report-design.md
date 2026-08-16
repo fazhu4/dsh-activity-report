@@ -96,7 +96,7 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 - “今天”是当前本地时区的 `[当天 00:00, 次日 00:00)`。
 - “近 7 天”和“近 30 天”分别包含今天在内的 7 个和 30 个本地自然日，不使用滚动的 168/720 小时窗口。
 - “全部”从最早可读事件到当前时间。
-- 所有 API 使用明确的 `startDay` 和排他的 `endDay`；服务端返回实际时区和边界。
+- 所有 API 使用明确的 `startDay` 和排他的 `endDayExclusive`；服务端返回实际时区和边界。
 - Agent 请求用量归入最终有效 usage 样本发生的日期；最终 message 替换早期 chunk 时允许样本迁移日期。压缩摘要用量归入 `compaction/summary` 日期。
 - 轮次结果归入 `turn/end` 日期，步骤归入 `step/end` 日期，工具调用数归入 `tool/call` 日期；工具结果、失败与耗时归入对应 `tool/result` 日期。
 - 卡片、趋势和明细必须从同一组日期桶聚合，不能按“会话最后活动时间”筛选整段会话总量。
@@ -139,10 +139,12 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 - `src/fold.ts`：单会话增量折叠；维护 watermark、步骤 usage 替换状态、开放时间区间和按日事实。
 - `src/query.ts`：在日期桶和筛选条件上完成汇总、排序与分页。
 - `src/http.ts`：参数验证、响应编码和 CSV 导出。
-- `src/index.ts`：Cordis 生命周期、历史回填、实时缓冲、持久化队列和路由注册。
+- `src/host.ts`：历史回填、实时缓冲、持久化队列、失败状态和显式重试。
+- `src/index.ts`：Cordis 生命周期、配置解析、事件监听和路由注册。
 - `src/client/api.ts`：带取消和响应校验的浏览器请求层。
 - `src/client/Section.tsx`：页面状态和区域组合。
-- `src/client/components/`：筛选栏、状态条、卡片、趋势、维度表和指标说明。
+- `src/client/Chart.tsx`：Token/请求日趋势图。
+- `src/client/styles.ts`：由 Cordis effect 拥有的页面样式。
 
 共享类型保持客户端安全，不从 host-only 包导入运行时值。单文件只承担一个明确职责，避免继续扩大当前 `index.ts` 和 `Section.tsx`。
 
@@ -151,23 +153,24 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 插件注入 `storageDomain`，打开版本化的 `activity_report` domain（storage domain 名称只允许小写字母、数字和下划线）。`sessions` 表以品牌化 Session ID 为键，每个值是一个原子会话折叠记录，包含：
 
 - 会话元数据：工作区、标题、创建时间。
+- 日期桶使用的规范 IANA 时区；缺失或不同的时区会触发从源会话重建。
 - 已持久化 watermark。
 - 跨事件增量所需状态：当前路由、开放步骤、首 Token、未完成工具调用和最近 usage 样本。
 - 按本地日期保存的用量、活动、性能、结果及各维度事实。
 
 同一会话的 watermark 和聚合数据必须作为一个记录原子写入，避免崩溃发生在“数据已写但 watermark 未写”或相反状态。内存变化按会话标记 dirty；持久化队列合并同一会话的连续更新，但每次提交调用 `table.put(sessionId, completeRecord)`。写入失败保留 dirty 状态并进入降级状态，下一次刷新或事件触发重试。插件卸载时停止接收新事件，排空已经接受的写入，再关闭 domain。
 
-旧的 `activity-report.json` 当前从未成功写入，因此不提供兼容迁移。domain 版本不匹配或记录校验失败时加载失败并报告诊断，不能静默清空。
+派生记录的旧时区字段允许被识别，但不会进入查询；插件删除该记录并从源会话重建。其他 domain 版本不匹配或记录校验失败会加载失败并报告诊断，不能静默清空。
 
 ### 启动与实时数据流
 
 1. 注册实时监听器，但先把事件写入按会话排序的缓冲区。
 2. 打开 storage domain 并加载已验证的会话折叠记录。
-3. 列举历史会话，读取 watermark 之后的持久事件并按 seq 回填。
+3. 列举历史会话，读取完整持久事件并按 seq 回填；折叠器按 watermark 跳过已处理事件。
 4. 对每个会话合并缓冲区；丢弃不高于当前 watermark 的重复事件，严格按 seq 折叠其余事件。
 5. 固化所有 dirty 会话后把状态切换为 `ready`，后续实时事件直接进入折叠和写入队列。
 
-回填接受 `AbortSignal`。卸载会停止新任务、取消正在读取的会话、排空已接受写入、注销 HTTP 路由和事件监听器。任何会话读取错误都记录会话 ID，并在状态接口报告失败数量；其余会话继续回填。
+卸载会停止启动新的回填任务、排空已接受写入、注销 HTTP 路由和事件监听器。当前 DSH `readSession` 接口不接受 `AbortSignal`，因此已经开始的单次会话读取会完成后再关闭 domain。任何会话读取错误都记录会话 ID，并在状态接口报告失败数量；其余会话继续回填。
 
 ## HTTP 接口
 
@@ -175,6 +178,7 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 - `GET /dsh-activity-report/breakdown`：`dimension`、排序、方向、游标和受限 `limit`；返回一页明细及下一游标。
 - `GET /dsh-activity-report/filters`：可用工作区、服务商和模型及其数据范围。
 - `GET /dsh-activity-report/export.csv`：导出当前筛选及维度的完整明细。
+- `POST /dsh-activity-report/retry`：重试 dirty 派生记录的固化并返回最新状态。
 
 所有接口接受 `range=today|7d|30d|all` 以及可重复的 workspace/provider/model 过滤参数。未知范围、维度、排序字段、无效游标和越界 limit 返回 400。JSON 响应包含 `status`、`timezone`、`startDay`、`endDayExclusive`、`lastPersistedAt` 和覆盖率。正常接口不返回未分页的全部会话。
 

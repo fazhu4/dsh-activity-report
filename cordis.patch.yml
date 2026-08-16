@@ -8,3 +8,4 @@
         persistDebounceMs: 1000
         backfillConcurrency: 4
         defaultPageSize: 25
+        timezone: !!js Intl.DateTimeFormat().resolvedOptions().timeZone
