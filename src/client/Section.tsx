@@ -253,13 +253,22 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const errors = [...new Set([filterError, summaryError, breakdownError, paginationError, retryError].filter((value): value is string => value !== null))]
 
   return <div className="dsh_activity_section">
-    <header className="dsh_activity_heading">
-      <div><h2 className="dsh_activity_title">{t('nav')}</h2><p>{t('subtitle')}</p></div>
-      <p className="dsh_activity_privacy">{t('privacy')}</p>
+    <header className="dsh_activity_hero">
+      <div className="dsh_activity_heroCopy">
+        <span className="dsh_activity_eyebrow">{t('nav')}</span>
+        <h2 className="dsh_activity_title">{t('nav')}</h2>
+        <p>{t('subtitle')}</p>
+      </div>
+      <div className="dsh_activity_privacy" role="note">
+        <span className="dsh_activity_privacyMark" aria-hidden="true" />
+        <span>{t('privacy')}</span>
+      </div>
     </header>
 
-    <div className="dsh_activity_filters">
-      <div className="dsh_activity_ranges" role="tablist" aria-label={t('localDays')}>
+    <div className="dsh_activity_toolbar">
+      <div className="dsh_activity_toolbarGroup dsh_activity_toolbarRange">
+        <span className="dsh_activity_toolbarLabel">{t('localDays')}</span>
+        <div className="dsh_activity_ranges" role="tablist" aria-label={t('localDays')}>
         {ranges.map((item) => <button
           key={item.id}
           type="button"
@@ -272,23 +281,30 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
           className={range === item.id ? 'is-active' : ''}
           onClick={() => setRange(item.id)}
           onKeyDown={(event) => tabKeys(event, range, ranges.map((value) => value.id), setRange)}
-        >{t(item.key)}</button>)}
+          >{t(item.key)}</button>)}
+        </div>
       </div>
-      <FilterSelect value={workspace} onChange={setWorkspace} all={t('allWorkspaces')} values={options.workspaces} />
-      <FilterSelect value={provider} onChange={setProvider} all={t('allProviders')} values={options.providers} disabled={dimension === 'tool'} />
-      <FilterSelect value={model} onChange={setModel} all={t('allModels')} values={options.models} disabled={dimension === 'tool'} />
-      <button type="button" className="dsh_activity_button" onClick={retryAndRefresh}>{t('refresh')}</button>
-      <a className="dsh_activity_button" href={api.exportUrl(selectedBreakdown)} download>{t('export')}</a>
+      <div className="dsh_activity_toolbarGroup dsh_activity_toolbarFilters">
+        <FilterSelect value={workspace} onChange={setWorkspace} all={t('allWorkspaces')} values={options.workspaces} />
+        <FilterSelect value={provider} onChange={setProvider} all={t('allProviders')} values={options.providers} disabled={dimension === 'tool'} />
+        <FilterSelect value={model} onChange={setModel} all={t('allModels')} values={options.models} disabled={dimension === 'tool'} />
+      </div>
+      <div className="dsh_activity_toolbarActions">
+        <button type="button" className="dsh_activity_button" onClick={retryAndRefresh}>{t('refresh')}</button>
+        <a className="dsh_activity_button dsh_activity_buttonPrimary" href={api.exportUrl(selectedBreakdown)} download>{t('export')}</a>
+      </div>
     </div>
 
     <div role="tabpanel" id="dsh_activity_range_panel" aria-labelledby={`dsh_activity_range_tab_${range}`}>
     {summary !== null && <div className={`dsh_activity_status is-${summary.status.phase}`}>
-      <strong>{statusLabel(summary, t)}</strong>
-      <span>{t('processed')}: {int(summary.status.processedSessions)} / {int(summary.status.totalSessions)}</span>
-      {summary.status.failedSessions > 0 && <span>{t('failedSessions')}: {int(summary.status.failedSessions)}</span>}
-      {summary.status.dirtyCount > 0 && <span>{t('dirtyRecords')}: {int(summary.status.dirtyCount)}</span>}
-      <span>{t('localDays')}: {inclusiveDayRange(summary.startDay, summary.endDayExclusive)}</span>
-      {summary.status.lastPersistedAt !== undefined && <span>{t('persisted')}: {new Date(summary.status.lastPersistedAt).toLocaleString()}</span>}
+      <div className="dsh_activity_statusMain"><span className="dsh_activity_statusMark" aria-hidden="true" /><strong>{statusLabel(summary, t)}</strong></div>
+      <div className="dsh_activity_statusMeta">
+        <span>{t('processed')}: {int(summary.status.processedSessions)} / {int(summary.status.totalSessions)}</span>
+        {summary.status.failedSessions > 0 && <span>{t('failedSessions')}: {int(summary.status.failedSessions)}</span>}
+        {summary.status.dirtyCount > 0 && <span>{t('dirtyRecords')}: {int(summary.status.dirtyCount)}</span>}
+        <span>{t('localDays')}: {inclusiveDayRange(summary.startDay, summary.endDayExclusive)}</span>
+        {summary.status.lastPersistedAt !== undefined && <span>{t('persisted')}: {new Date(summary.status.lastPersistedAt).toLocaleString()}</span>}
+      </div>
     </div>}
 
     {errors.map((error) => <div key={error} className="dsh_activity_error" role="alert">{t('loadError')}: {error}</div>)}
