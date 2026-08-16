@@ -59,7 +59,7 @@ const coverageSchema = z.object({
   ttft: z.object({ samples: count, total: count }).strict(),
   toolTiming: z.object({ samples: count, total: count }).strict(),
 }).strict()
-const statusSchema = z.object({
+export const statusSchema = z.object({
   phase: z.enum(['backfilling', 'ready', 'degraded', 'disposed']),
   processedSessions: count,
   totalSessions: count,
@@ -67,7 +67,7 @@ const statusSchema = z.object({
   dirtyCount: count,
   lastPersistedAt: z.number().optional(),
 }).strict()
-const summarySchema = z.object({
+export const summarySchema = z.object({
   range: z.enum(['today', '7d', '30d', 'all']),
   timezone: z.string().min(1),
   startDay: z.string(),
@@ -82,8 +82,9 @@ const summarySchema = z.object({
   activeWorkspaces: count,
   status: statusSchema,
 }).strict()
-const breakdownSchema = z.object({
+export const breakdownSchema = z.object({
   dimension: z.enum(['workspace', 'provider', 'model', 'session', 'tool']),
+  revision: z.string().min(1),
   rows: z.array(z.object({
     key: z.string(),
     metrics,
@@ -99,7 +100,7 @@ const breakdownSchema = z.object({
   status: statusSchema,
   coverage: coverageSchema,
 }).strict()
-const filtersSchema = z.object({
+export const filtersSchema = z.object({
   workspaces: z.array(z.string()),
   providers: z.array(z.string()),
   models: z.array(z.string()),
@@ -109,6 +110,7 @@ const filtersSchema = z.object({
   status: statusSchema,
   coverage: coverageSchema,
 }).strict()
+export const retrySchema = z.object({ status: statusSchema }).strict()
 
 function params(query: ClientFilters & Partial<ClientBreakdownQuery>): URLSearchParams {
   const result = new URLSearchParams({ range: query.range })
@@ -148,8 +150,8 @@ export function createActivityClient(fetcher: typeof globalThis.fetch = globalTh
       { signal },
     ))) as ActivityFilterResponse,
     retry: async (signal) => {
-      const response = await json(await fetcher('/dsh-activity-report/retry', { method: 'POST', signal }))
-      return statusSchema.parse((response as { status?: unknown }).status) as ActivityDataStatus
+      const response = retrySchema.parse(await json(await fetcher('/dsh-activity-report/retry', { method: 'POST', signal })))
+      return response.status as ActivityDataStatus
     },
     exportUrl: (query) => `/dsh-activity-report/export.csv?${params(query)}`,
   }

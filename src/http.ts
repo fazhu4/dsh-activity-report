@@ -12,6 +12,7 @@ import type { ActivityRuntimeStatus } from './host.ts'
 import { dayKey } from './fold.ts'
 import { ActivityQueryError, queryBreakdown, queryFilterOptions, querySummary } from './query.ts'
 import { totalTokens } from './metrics.ts'
+import { breakdownSchema, filtersSchema, retrySchema, summarySchema } from './client/api.ts'
 
 /** Web server route registration format used by DSH. */
 export interface WebRoute {
@@ -122,6 +123,10 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body))
 }
 
+function validatedJson(res: ServerResponse, body: unknown, schema: { parse(value: unknown): unknown }): void {
+  json(res, 200, schema.parse(body))
+}
+
 function csvCell(value: string | number): string {
   let text = String(value)
   if (/^[\t\r\n]|^\s*[=+\-@]/.test(text)) text = `'${text}`
@@ -186,6 +191,7 @@ function csvRows(dimension: BreakdownDimension, rows: Awaited<ReturnType<typeof 
             ['tool_calls', row => row.metrics.activity.toolCalls],
             ['tool_results', row => row.metrics.activity.toolResults],
             ['tool_errors', row => row.metrics.activity.toolErrors],
+            ['message_samples', row => row.metrics.performance.messageSamples],
             ['model_ms', row => row.metrics.performance.modelMs],
             ['tool_ms', row => row.metrics.performance.toolMs],
             ['ttft_ms', row => row.metrics.performance.ttftMs],
@@ -200,6 +206,7 @@ function csvRows(dimension: BreakdownDimension, rows: Awaited<ReturnType<typeof 
           ['tool_calls', row => row.metrics.activity.toolCalls],
           ['tool_results', row => row.metrics.activity.toolResults],
           ['tool_errors', row => row.metrics.activity.toolErrors],
+          ['message_samples', row => row.metrics.performance.messageSamples],
           ['model_ms', row => row.metrics.performance.modelMs],
           ['tool_ms', row => row.metrics.performance.toolMs],
           ['ttft_ms', row => row.metrics.performance.ttftMs],
@@ -243,21 +250,21 @@ function handler(
       switch (endpoint) {
         case 'retry':
           await source.retryPersistence()
-          json(res, 200, { status: source.status() })
+          validatedJson(res, { status: source.status() }, retrySchema)
           return
         case 'summary':
-          json(res, 200, { ...querySummary(records, filters(params, source)), status: source.status() })
+          validatedJson(res, { ...querySummary(records, filters(params, source)), status: source.status() }, summarySchema)
           return
         case 'breakdown': {
           const query = breakdownQuery(params, source, config)
           const summary = querySummary(records, query)
-          json(res, 200, { ...queryBreakdown(records, query), ...context(summary, source) })
+          validatedJson(res, { ...queryBreakdown(records, query), ...context(summary, source) }, breakdownSchema)
           return
         }
         case 'filters': {
           const query = filters(params, source)
           const summary = querySummary(records, query)
-          json(res, 200, { ...queryFilterOptions(records, query), ...context(summary, source) })
+          validatedJson(res, { ...queryFilterOptions(records, query), ...context(summary, source) }, filtersSchema)
           return
         }
         case 'export': {

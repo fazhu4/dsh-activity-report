@@ -55,6 +55,7 @@ export class ActivityRuntime {
   private readonly writeFailures = new Set<SessionId>()
   private readonly buffered = new Map<SessionId, SessionEvent[]>()
   private readonly bufferedHeaders = new Map<SessionId, SessionHeader>()
+  private readonly unreconciled = new Set<SessionId>()
   private readonly countedSessions = new Set<SessionId>()
   private readonly abort = new AbortController()
   private domain?: ActivityDomain
@@ -121,7 +122,9 @@ export class ActivityRuntime {
     })
     await Promise.all(workers)
 
-    for (const id of [...this.buffered.keys()]) this.drainBuffered(id)
+    for (const id of [...this.buffered.keys()]) {
+      if (!this.unreconciled.has(id)) this.drainBuffered(id)
+    }
     await this.flush()
     this.updateOperationalPhase()
   }
@@ -129,7 +132,7 @@ export class ActivityRuntime {
   /** Accept one post-commit live Session event without awaiting storage. */
   acceptLive(header: SessionHeader, event: SessionEvent): void {
     if (!this.accepting) return
-    if (this.phase === 'backfilling') {
+    if (this.phase === 'backfilling' || this.unreconciled.has(header.id)) {
       const events = this.buffered.get(header.id) ?? []
       events.push(event)
       this.buffered.set(header.id, events)
@@ -240,9 +243,11 @@ export class ActivityRuntime {
         }
       }
       this.fold(header.id, [...snapshot.events].sort((left, right) => left.seq - right.seq))
+      this.unreconciled.delete(header.id)
       this.drainBuffered(header.id)
     } catch (error) {
       if (!this.abort.signal.aborted) {
+        this.unreconciled.add(header.id)
         this.failedSessions += 1
         this.deps.onError?.(error, header.id)
       }

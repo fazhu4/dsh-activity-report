@@ -18,7 +18,7 @@ export interface LocaleDict {
   search: string; sort: string; descending: string; ascending: string; loadMore: string
   input: string; cacheRead: string; cacheWrite: string; output: string; reasoning: string
   turns: string; steps: string; calls: string; results: string; errors: string; agentRequests: string; compactionRequests: string
-  modelTime: string; toolTime: string; avgTtft: string; ttftCoverage: string; outputSpeed: string; errorRate: string; average: string
+  modelTime: string; toolTime: string; modelTimingCoverage: string; toolTimingCoverage: string; avgTtft: string; ttftCoverage: string; outputSpeed: string; errorRate: string; average: string
   performance: string; outcomes: string; metricNotes: string; metricNotesBody: string
   toolFailureTrend: string; toolFailureHint: string
   toolFilterHint: string
@@ -38,7 +38,7 @@ export const zh: LocaleDict = {
   search: '搜索当前维度', sort: '排序', descending: '降序', ascending: '升序', loadMore: '加载更多',
   input: '未缓存输入', cacheRead: '缓存读取', cacheWrite: '缓存写入', output: '输出', reasoning: '其中推理',
   turns: '轮次', steps: '步骤', calls: '调用', results: '已返回', errors: '失败', agentRequests: 'Agent 请求', compactionRequests: 'Compaction 请求',
-  modelTime: '模型耗时', toolTime: '工具耗时', avgTtft: '平均首 Token', ttftCoverage: 'TTFT 覆盖率', outputSpeed: '输出速度', errorRate: '失败率', average: '平均耗时',
+  modelTime: '模型耗时', toolTime: '工具耗时', modelTimingCoverage: '模型耗时覆盖率', toolTimingCoverage: '工具耗时覆盖率', avgTtft: '平均首 Token', ttftCoverage: 'TTFT 覆盖率', outputSpeed: '输出速度', errorRate: '失败率', average: '平均耗时',
   performance: '性能与结果', outcomes: '轮次结果', metricNotes: '指标说明',
   toolFailureTrend: '工具失败趋势', toolFailureHint: '失败数 / 已返回数',
   toolFilterHint: '工具事件不能精确归因到服务商或模型；清除这两项筛选后查看工具维度。',
@@ -59,7 +59,7 @@ export const en: LocaleDict = {
   search: 'Search this dimension', sort: 'Sort', descending: 'Descending', ascending: 'Ascending', loadMore: 'Load more',
   input: 'Uncached input', cacheRead: 'Cache read', cacheWrite: 'Cache write', output: 'Output', reasoning: 'Reasoning subset',
   turns: 'Turns', steps: 'Steps', calls: 'Calls', results: 'Returned', errors: 'Errors', agentRequests: 'Agent requests', compactionRequests: 'Compaction requests',
-  modelTime: 'Model time', toolTime: 'Tool time', avgTtft: 'Average TTFT', ttftCoverage: 'TTFT coverage', outputSpeed: 'Output speed', errorRate: 'Error rate', average: 'Average',
+  modelTime: 'Model time', toolTime: 'Tool time', modelTimingCoverage: 'Model timing coverage', toolTimingCoverage: 'Tool timing coverage', avgTtft: 'Average TTFT', ttftCoverage: 'TTFT coverage', outputSpeed: 'Output speed', errorRate: 'Error rate', average: 'Average',
   performance: 'Performance and outcomes', outcomes: 'Turn outcomes', metricNotes: 'Metric definitions',
   toolFailureTrend: 'Tool failure trend', toolFailureHint: 'Errors / returned',
   toolFilterHint: 'Tool events cannot be attributed exactly to a provider or model. Clear those filters to view tools.',

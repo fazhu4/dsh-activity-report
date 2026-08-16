@@ -63,7 +63,7 @@ DeepSeek 官方用量把输入区分为缓存命中和缓存未命中，并单�
 | 缓存复用率 | 缓存读取 /（未缓存输入 + 缓存读取 + 缓存写入）；分母为 0 时未定义 |
 | 平均输入/输出 | 相应 Token / 已计量请求；请求为 0 时未定义 |
 
-Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 usage 的最终 message 到达时替换同一步的早期样本，不能重复累计；不带 usage 的最终 message 不删除早期样本。未报告 usage 的步骤不产生请求或 Token，并通过 Agent Usage 覆盖率暴露。压缩摘要的 usage 按单个 `compaction/summary` 事件计入，不能与它产生的表层替换事件重复计算。
+Agent usage chunk 先到而最终 message 缺失时，样本保留在开放步骤状态；带 usage 的最终 message 到达时替换同一步的早期样本，不能重复累计；不带 usage 的最终 message 不删除早期样本。只有 `step/end` 到达后，最终样本才与步骤一起归入该结束自然日。未报告 usage 的闭合步骤不产生请求或 Token，并通过 Agent Usage 覆盖率暴露。压缩摘要的 usage 按单个 `compaction/summary` 事件计入，不能与它产生的表层替换事件重复计算。
 
 ### 活动与可靠性
 
@@ -98,7 +98,7 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 - “全部”从最早可读事件到当前时间。
 - 所有 API 使用明确的 `startDay` 和排他的 `endDayExclusive`；服务端返回实际时区和边界。
 - Agent 请求用量归入最终有效 usage 样本发生的日期；最终 message 替换早期 chunk 时允许样本迁移日期。压缩摘要用量归入 `compaction/summary` 日期。
-- 轮次结果归入 `turn/end` 日期，步骤归入 `step/end` 日期，工具调用数归入 `tool/call` 日期；工具结果、失败与耗时归入对应 `tool/result` 日期。
+- 轮次结果归入 `turn/end` 日期；步骤、Agent usage、模型耗时和 TTFT 归入 `step/end` 日期；工具调用、对应结果、失败与耗时统一归入 `tool/call` 日期。
 - 卡片、趋势和明细必须从同一组日期桶聚合，不能按“会话最后活动时间”筛选整段会话总量。
 
 ## 维度与可展示字段
@@ -167,7 +167,7 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 1. 注册实时监听器，但先把事件写入按会话排序的缓冲区。
 2. 打开 storage domain 并加载已验证的会话折叠记录。
 3. 列举历史会话，读取完整持久事件并按 seq 回填；折叠器按 watermark 跳过已处理事件。
-4. 对每个会话合并缓冲区；丢弃不高于当前 watermark 的重复事件，严格按 seq 折叠其余事件。
+4. 对读取成功的会话合并缓冲区；丢弃不高于当前 watermark 的重复事件，严格按 seq 折叠其余事件。读取失败的会话保持隔离，实时事件继续缓冲且不得推进 watermark，等待下次完整回填恢复。
 5. 固化所有 dirty 会话后把状态切换为 `ready`，后续实时事件直接进入折叠和写入队列。
 
 卸载会停止启动新的回填任务、排空已接受写入、注销 HTTP 路由和事件监听器。当前 DSH `readSession` 接口不接受 `AbortSignal`，因此已经开始的单次会话读取会完成后再关闭 domain。任何会话读取错误都记录会话 ID，并在状态接口报告失败数量；其余会话继续回填。
@@ -175,12 +175,12 @@ Agent usage chunk 先到而最终 message 缺失时，样本仍然保留。带 u
 ## HTTP 接口
 
 - `GET /dsh-activity-report/summary`：筛选后的卡片、趋势、性能、结果和数据质量。
-- `GET /dsh-activity-report/breakdown`：`dimension`、排序、方向、游标和受限 `limit`；返回一页明细及下一游标。
+- `GET /dsh-activity-report/breakdown`：`dimension`、排序、方向、游标和受限 `limit`；返回投影修订号、一页明细及下一游标。翻页期间投影变化会拒绝旧游标并要求从第一页重载。
 - `GET /dsh-activity-report/filters`：可用工作区、服务商和模型及其数据范围。
 - `GET /dsh-activity-report/export.csv`：导出当前筛选及维度的完整明细。
 - `POST /dsh-activity-report/retry`：重试 dirty 派生记录的固化并返回最新状态。
 
-所有接口接受 `range=today|7d|30d|all` 以及可重复的 workspace/provider/model 过滤参数。未知范围、维度、排序字段、无效游标和越界 limit 返回 400。JSON 响应包含 `status`、`timezone`、`startDay`、`endDayExclusive`、`lastPersistedAt` 和覆盖率。正常接口不返回未分页的全部会话。
+所有接口接受 `range=today|7d|30d|all` 以及可重复的 workspace/provider/model 过滤参数。未知范围、维度、排序字段、无效或过期游标和越界 limit 返回 400。JSON 响应在服务端发送前通过共享 schema 校验，并包含 `status`、`timezone`、`startDay`、`endDayExclusive`、`lastPersistedAt` 和覆盖率。正常接口不返回未分页的全部会话。
 
 ## 错误处理与数据质量
 

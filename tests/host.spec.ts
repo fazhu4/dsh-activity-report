@@ -133,6 +133,37 @@ describe('activity host lifecycle', () => {
     await runtime.dispose()
   })
 
+  it('quarantines live events when backfill fails instead of advancing the persisted watermark', async () => {
+    const persisted = createFoldState(SESSION_ID, { cwd: 'G:/project' }, 'Asia/Shanghai')
+    foldEvents(persisted, [event(0), event(1), event(2)], 'Asia/Shanghai')
+    const domain = fakeDomain(persisted.record)
+    const first = new ActivityRuntime(dependencies(domain, async () => { throw new Error('session read failed') }), {
+      persistDebounceMs: 0,
+      backfillConcurrency: 1,
+      timezone: 'Asia/Shanghai',
+    })
+
+    const starting = first.start()
+    first.acceptLive(header(), event(5))
+    await starting
+    await first.flush()
+
+    expect(first.status()).toMatchObject({ phase: 'degraded', failedSessions: 1 })
+    expect(first.records()[0]?.watermark).toBe(2)
+    expect(domain.puts.at(-1)?.watermark).not.toBe(5)
+    await first.dispose()
+
+    const second = new ActivityRuntime(dependencies(domain, async () => ({
+      session: header(),
+      events: [event(0), event(1), event(2), event(3), event(4), event(5)],
+    })), { persistDebounceMs: 0, backfillConcurrency: 1, timezone: 'Asia/Shanghai' })
+    await second.start()
+
+    expect(second.records()[0]?.watermark).toBe(5)
+    expect(second.records()[0]?.days['1970-01-01']?.totals.usage.requests).toBe(6)
+    await second.dispose()
+  })
+
   it('drains accepted writes before closing the domain', async () => {
     const domain = fakeDomain()
     const runtime = new ActivityRuntime(dependencies(domain, async () => ({ session: header(), events: [] })), {

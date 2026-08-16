@@ -68,7 +68,8 @@ const sessionRecordSchema = z.object({
       step: count,
       startTime: z.number(),
       firstTokenTime: z.number().optional(),
-      messageRecorded: z.boolean().optional(),
+      messageTime: z.number().optional(),
+      messageOutputTokens: count.optional(),
       route: routeSchema.optional(),
     }).strict().optional(),
     openUsage: z.object({
@@ -80,7 +81,7 @@ const sessionRecordSchema = z.object({
       usage: usageSchema,
     }).strict().optional(),
     lastCountedTurn: z.number().int().nonnegative().nullable(),
-    pendingTools: z.record(z.string(), z.object({ name: z.string(), startTime: z.number() }).strict()),
+    pendingTools: z.record(z.string(), z.object({ name: z.string(), startTime: z.number(), day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict()),
     seenToolCalls: z.record(z.string(), z.literal(true)).optional(),
   }).strict(),
   days: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), dayFactsSchema),
@@ -89,7 +90,7 @@ const sessionRecordSchema = z.object({
 /** Versioned storage-domain declaration for activity folds. */
 export const activityReportDomainSpec = defineDomain({
   name: 'activity_report',
-  version: 0,
+  version: 1,
   tables: {
     sessions: domainTable<SessionId, SessionRecord>(sessionRecordSchema),
   },

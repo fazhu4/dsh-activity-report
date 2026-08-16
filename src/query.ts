@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type {
   ActivityCoverage,
   ActivityFilterOptions,
@@ -200,6 +201,14 @@ interface CursorValue {
   value: string | number
   key: string
   scope: string
+  revision: string
+}
+
+function projectionRevision(records: readonly SessionRecord[]): string {
+  const source = [...records]
+    .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+    .map((record) => [record.sessionId, record.watermark, record.timezone, record.metadata])
+  return createHash('sha256').update(JSON.stringify(source)).digest('base64url')
 }
 
 function normalizedValues(values: readonly string[] | undefined): string[] {
@@ -223,7 +232,7 @@ function encodeCursor(value: CursorValue): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
 }
 
-function decodeCursor(cursor: string, query: BreakdownQuery, scope: string): CursorValue {
+function decodeCursor(cursor: string, query: BreakdownQuery, scope: string, revision: string): CursorValue {
   let value: unknown
   try {
     value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
@@ -236,6 +245,7 @@ function decodeCursor(cursor: string, query: BreakdownQuery, scope: string): Cur
     || (typeof candidate.value !== 'number' && typeof candidate.value !== 'string') || typeof candidate.key !== 'string') {
     throw new ActivityQueryError('cursor does not match this query')
   }
+  if (candidate.revision !== revision) throw new ActivityQueryError('activity data changed; reload the first page')
   return candidate as CursorValue
 }
 
@@ -313,6 +323,7 @@ export function queryBreakdown(records: readonly SessionRecord[], query: Breakdo
   }
   const bounds = resolveBounds(records, query)
   const scope = cursorScope(query, bounds)
+  const revision = projectionRevision(records)
   const search = query.search?.trim().toLocaleLowerCase()
   const rows = collectRows(records, query, bounds)
     .filter((row) => search === undefined || search === '' || `${row.key} ${row.title ?? ''} ${row.cwd ?? ''}`.toLocaleLowerCase().includes(search))
@@ -325,7 +336,7 @@ export function queryBreakdown(records: readonly SessionRecord[], query: Breakdo
 
   let start = 0
   if (query.cursor !== undefined) {
-    const cursor = decodeCursor(query.cursor, query, scope)
+    const cursor = decodeCursor(query.cursor, query, scope, revision)
     const index = rows.findIndex((row) => row.key === cursor.key && sortValue(row, query.sort) === cursor.value)
     if (index < 0) throw new ActivityQueryError('cursor row is no longer available')
     start = index + 1
@@ -340,10 +351,12 @@ export function queryBreakdown(records: readonly SessionRecord[], query: Breakdo
         value: sortValue(last, query.sort),
         key: last.key,
         scope,
+        revision,
       })
     : undefined
   return {
     dimension: query.dimension,
+    revision,
     rows: pageRows,
     ...(nextCursor === undefined ? {} : { nextCursor }),
   }

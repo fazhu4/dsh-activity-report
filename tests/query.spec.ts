@@ -135,6 +135,20 @@ describe('reconciled activity queries', () => {
     })).toThrow('cursor does not match this query')
   })
 
+  it('rejects pagination after the underlying projection changes', () => {
+    const filters = { range: '7d' as const, timezone: 'Asia/Shanghai', now: NOW }
+    const first = queryBreakdown(records, {
+      ...filters, dimension: 'session', sort: 'tokens', direction: 'desc', limit: 1,
+    })
+    const changed = structuredClone(records)
+    changed[0]!.watermark += 1
+
+    expect(() => queryBreakdown(changed, {
+      ...filters, dimension: 'session', sort: 'tokens', direction: 'desc', limit: 1,
+      cursor: first.nextCursor,
+    })).toThrow('activity data changed')
+  })
+
   it('rejects route filters for unattributed tool facts', () => {
     expect(() => queryBreakdown(records, {
       range: 'today', timezone: 'Asia/Shanghai', now: NOW,

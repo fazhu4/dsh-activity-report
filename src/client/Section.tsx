@@ -129,6 +129,7 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const summaryRequest = useRef(0)
   const breakdownRequest = useRef(0)
   const paginationController = useRef<AbortController | null>(null)
+  const retryController = useRef<AbortController | null>(null)
 
   const selectedFilters = useMemo(
     () => filtersQuery(range, workspace, provider, model),
@@ -141,13 +142,22 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const routeFilterActive = provider !== '' || model !== ''
 
   const retryAndRefresh = (): void => {
-    void api.retry().then(() => {
-      setRetryError(null)
-      setRefresh((value) => value + 1)
+    retryController.current?.abort()
+    const controller = new AbortController()
+    retryController.current = controller
+    void api.retry(controller.signal).then(() => {
+      if (!controller.signal.aborted) {
+        setRetryError(null)
+        setRefresh((value) => value + 1)
+      }
     }).catch((cause: unknown) => {
-      setRetryError(cause instanceof Error ? cause.message : String(cause))
+      if (!controller.signal.aborted) setRetryError(cause instanceof Error ? cause.message : String(cause))
+    }).finally(() => {
+      if (retryController.current === controller) retryController.current = null
     })
   }
+
+  useEffect(() => () => { retryController.current?.abort() }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -400,7 +410,7 @@ function BreakdownTable({ dimension, rows, openSession, t }: {
       </> : <>
         <th>{t('requests')}</th>{providerLike && <><th>{t('agentRequests')}</th><th>{t('compactionRequests')}</th><th>{t('usageCoverage')}</th></>}<th>{t('input')}</th><th>{t('cacheRead')}</th><th>{t('cacheWrite')}</th><th>{t('output')}</th><th>{t('tokens')}</th>
         {!providerLike && <><th>{t('turns')}</th><th>{t('steps')}</th><th>{t('calls')}</th><th>{t('errors')}</th><th>{t('outcomes')}</th></>}
-        <th>{t('modelTime')}</th>{!providerLike && <th>{t('toolTime')}</th>}<th>{t('avgTtft')}</th><th>{t('ttftCoverage')}</th><th>{t('outputSpeed')}</th>
+        <th>{t('modelTime')}</th><th>{t('modelTimingCoverage')}</th>{!providerLike && <><th>{t('toolTime')}</th><th>{t('toolTimingCoverage')}</th></>}<th>{t('avgTtft')}</th><th>{t('ttftCoverage')}</th><th>{t('outputSpeed')}</th>
       </>}
     </tr></thead>
     <tbody>{rows.map((row) => <tr key={row.key}>
@@ -419,12 +429,14 @@ function MetricCells({ row, providerLike, t }: { row: BreakdownRow; providerLike
   const agentCoverage = metrics.activity.steps === 0 ? t('notReported') : percent(agentRequests, metrics.activity.steps)
   const ttft = metrics.performance.ttftSamples === 0 ? t('notReported') : duration(metrics.performance.ttftMs / metrics.performance.ttftSamples)
   const ttftCoverage = metrics.performance.messageSamples === 0 ? t('notReported') : percent(metrics.performance.ttftSamples, metrics.performance.messageSamples)
+  const modelTimingCoverage = metrics.activity.steps === 0 ? t('notReported') : percent(metrics.performance.messageSamples, metrics.activity.steps)
+  const toolTimingCoverage = metrics.activity.toolCalls === 0 ? t('notReported') : percent(metrics.activity.toolResults, metrics.activity.toolCalls)
   const speed = metrics.performance.decodeMs === 0 || metrics.performance.decodeTokens === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)}/s`
   const outcomes = Object.entries(metrics.activity.outcomes).map(([key, value]) => `${key}: ${int(value)}`).join(', ')
   return <>
     <td>{int(metrics.usage.requests)}</td>{providerLike && <><td>{int(agentRequests)}</td><td>{int(compactionRequests)}</td><td>{agentCoverage}</td></>}<td>{int(metrics.usage.input)}</td><td>{int(metrics.usage.cacheRead)}</td><td>{int(metrics.usage.cacheWrite)}</td><td>{int(metrics.usage.output)}</td><td>{int(totalTokens(metrics.usage))}</td>
     {!providerLike && <><td>{int(metrics.activity.turns)}</td><td>{int(metrics.activity.steps)}</td><td>{int(metrics.activity.toolCalls)}</td><td>{int(metrics.activity.toolErrors)}</td><td>{outcomes === '' ? t('notReported') : outcomes}</td></>}
-    <td>{metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)}</td>{!providerLike && <td>{metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)}</td>}<td>{ttft}</td><td>{ttftCoverage}</td><td>{speed}</td>
+    <td>{metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)}</td><td>{modelTimingCoverage}</td>{!providerLike && <><td>{metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)}</td><td>{toolTimingCoverage}</td></>}<td>{ttft}</td><td>{ttftCoverage}</td><td>{speed}</td>
   </>
 }
 
@@ -440,11 +452,15 @@ function ToolCells({ metrics, t }: { metrics: Metrics; t: ActivityT }): JSX.Elem
 function Performance({ metrics, coverage, t }: { metrics: Metrics; coverage: ActivityCoverage; t: ActivityT }): JSX.Element {
   const ttft = metrics.performance.ttftSamples === 0 ? t('notReported') : duration(metrics.performance.ttftMs / metrics.performance.ttftSamples)
   const ttftCoverage = coverage.ttft.total === 0 ? t('notReported') : percent(coverage.ttft.samples, coverage.ttft.total)
+  const modelTimingCoverage = coverage.modelTiming.total === 0 ? t('notReported') : percent(coverage.modelTiming.samples, coverage.modelTiming.total)
+  const toolTimingCoverage = coverage.toolTiming.total === 0 ? t('notReported') : percent(coverage.toolTiming.samples, coverage.toolTiming.total)
   const speed = metrics.performance.decodeMs === 0 || metrics.performance.decodeTokens === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)} ${t('tokens')}/s`
   return <section className="dsh_activity_panel"><h3>{t('performance')}</h3>
     <div className="dsh_activity_performance">
       <MetricCard label={t('avgTtft')} value={ttft} />
       <MetricCard label={t('ttftCoverage')} value={ttftCoverage} detail={`${int(coverage.ttft.samples)} / ${int(coverage.ttft.total)}`} />
+      <MetricCard label={t('modelTimingCoverage')} value={modelTimingCoverage} detail={`${int(coverage.modelTiming.samples)} / ${int(coverage.modelTiming.total)}`} />
+      <MetricCard label={t('toolTimingCoverage')} value={toolTimingCoverage} detail={`${int(coverage.toolTiming.samples)} / ${int(coverage.toolTiming.total)}`} />
       <MetricCard label={t('outputSpeed')} value={speed} />
       <MetricCard label={t('modelTime')} value={metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)} />
       <MetricCard label={t('toolTime')} value={metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)} />
@@ -464,7 +480,7 @@ function ReliabilityTrend({ points, t }: { points: ActivitySummaryResponse['seri
       return <div key={point.day}>
         <span>{point.day}</span>
         <div><i style={{ width: returned === 0 ? '0%' : `${Math.min(100, errors / returned * 100)}%` }} /></div>
-        <strong>{int(errors)} / {int(returned)}</strong>
+        <strong>{returned === 0 ? t('notReported') : `${int(errors)} / ${int(returned)}`}</strong>
       </div>
     })}</div>
   </section>

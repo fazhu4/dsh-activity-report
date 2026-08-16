@@ -17,8 +17,6 @@ export const cssText = `
 @media(max-width:760px){.dsh_activity_heading{flex-direction:column}.dsh_activity_privacy{text-align:left}.dsh_activity_filters>*{flex:1 1 145px}.dsh_activity_ranges{flex:1 1 100%;justify-content:space-between}.dsh_activity_ranges button{flex:1}.dsh_activity_cards{grid-template-columns:repeat(2,minmax(0,1fr))}.dsh_activity_panel{padding:11px}.dsh_activity_tooltip{position:static;margin:8px 0}.dsh_activity_dimensionTabs{gap:10px;overflow-x:auto}}
 `
 
-let styleUsers = 0
-
 /** Adopt the activity stylesheet and return one idempotent ownership release. */
 export function adoptStyles(): () => void {
   if (typeof document === 'undefined') return () => {}
@@ -29,12 +27,15 @@ export function adoptStyles(): () => void {
     document.head.appendChild(style)
   }
   style.textContent = cssText
-  styleUsers += 1
+  style.dataset.activityUsers = String(Number(style.dataset.activityUsers ?? '0') + 1)
   let released = false
   return () => {
     if (released) return
     released = true
-    styleUsers = Math.max(0, styleUsers - 1)
-    if (styleUsers === 0) document.getElementById('dsh-activity-report-styles')?.remove()
+    const current = document.getElementById('dsh-activity-report-styles') as HTMLStyleElement | null
+    if (current === null) return
+    const users = Math.max(0, Number(current.dataset.activityUsers ?? '0') - 1)
+    current.dataset.activityUsers = String(users)
+    if (users === 0) current.remove()
   }
 }

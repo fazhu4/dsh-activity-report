@@ -84,10 +84,56 @@ describe('session activity fold', () => {
         message: { source: { kind: 'model', provider: 'p', model: 'm' } },
         usage: usage(6, 2),
       }),
+      event(3, afterMidnight + 100, 'step/end', { turn: 1, step: 1 }),
     ], 'Asia/Shanghai')
 
     expect(state.record.days['2026-08-15']).toBeUndefined()
     expect(state.record.days['2026-08-16']?.totals.usage).toMatchObject({ requests: 1, input: 6, output: 2 })
+  })
+
+  it('does not publish usage or timing coverage until the step closes', () => {
+    const state = createFoldState(SESSION_ID)
+    foldEvents(state, [
+      event(0, 100, 'step/start', { turn: 1, step: 1 }),
+      event(1, 110, 'request/context', { provider: 'p', model: 'm' }),
+      event(2, 130, 'assistant/message', {
+        turn: 1,
+        step: 1,
+        message: { source: { kind: 'model', provider: 'p', model: 'm' } },
+        usage: usage(4, 1),
+      }),
+    ])
+
+    expect(state.record.days).toEqual({})
+    foldEvents(state, [event(3, 150, 'step/end', { turn: 1, step: 1 })])
+    expect(state.record.days[DAY_1]?.totals).toMatchObject({
+      usage: { requests: 1 },
+      activity: { steps: 1 },
+      performance: { messageSamples: 1 },
+    })
+  })
+
+  it('attributes a cross-midnight step and tool result to one cohort day', () => {
+    const state = createFoldState(SESSION_ID)
+    const beforeMidnight = Date.parse('2026-08-15T23:59:59+08:00')
+    const afterMidnight = Date.parse('2026-08-16T00:00:01+08:00')
+    foldEvents(state, [
+      event(0, beforeMidnight - 100, 'step/start', { turn: 1, step: 1 }),
+      event(1, beforeMidnight, 'assistant/message', {
+        turn: 1,
+        step: 1,
+        message: { source: { kind: 'model', provider: 'p', model: 'm' } },
+        usage: usage(4, 1),
+      }),
+      event(2, beforeMidnight, 'tool/call', { turn: 1, step: 1, callId: 'cross-day', name: 'bash', arguments: '{}' }),
+      event(3, afterMidnight, 'tool/result', { turn: 1, step: 1, message: { source: { callId: 'cross-day' } } }),
+      event(4, afterMidnight, 'step/end', { turn: 1, step: 1 }),
+    ], 'Asia/Shanghai')
+
+    expect(state.record.days['2026-08-15']?.totals.activity).toMatchObject({ toolCalls: 1, toolResults: 1 })
+    expect(state.record.days['2026-08-16']?.totals).toMatchObject({
+      usage: { requests: 1 }, activity: { steps: 1 }, performance: { messageSamples: 1 },
+    })
   })
 
   it('counts compaction usage once under its own origin', () => {

@@ -42,7 +42,8 @@ export interface OpenStep {
   step: number
   startTime: number
   firstTokenTime?: number
-  messageRecorded?: boolean
+  messageTime?: number
+  messageOutputTokens?: number
   route?: RouteRef
 }
 
@@ -50,6 +51,7 @@ export interface OpenStep {
 export interface PendingTool {
   name: string
   startTime: number
+  day: string
 }
 
 /** Cross-event state required to continue an incremental fold after restart. */
@@ -187,6 +189,8 @@ export interface BreakdownRow extends MetricGroup {
 /** Cursor-paginated dimension response. */
 export interface BreakdownPage {
   dimension: BreakdownDimension
+  /** Projection identity used to reject pagination across live updates. */
+  revision: string
   rows: BreakdownRow[]
   nextCursor?: string
 }

@@ -118,6 +118,7 @@ describe('activity report HTTP API', () => {
 
     expect(header?.split(',').filter((column) => column === 'workspace')).toHaveLength(1)
     expect(header).not.toContain(',title,workspace')
+    expect(header).toContain('message_samples')
   })
 
   it('maps unexpected failures to a generic 500 response', async () => {
@@ -130,6 +131,18 @@ describe('activity report HTTP API', () => {
     expect(response.status).toBe(500)
     expect(response.json()).toEqual({ error: 'internal server error' })
     expect(response.body).not.toContain('secret storage path')
+    expect(onError).toHaveBeenCalledOnce()
+  })
+
+  it('validates generated JSON responses before sending them', async () => {
+    const onError = vi.fn()
+    const response = await harness(undefined, {
+      status: () => ({ phase: 'invalid' } as never),
+      onError,
+    }).request('/dsh-activity-report/summary?range=today')
+
+    expect(response.status).toBe(500)
+    expect(response.json()).toEqual({ error: 'internal server error' })
     expect(onError).toHaveBeenCalledOnce()
   })
 

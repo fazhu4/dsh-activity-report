@@ -42,8 +42,8 @@ function responseContext() {
   }
 }
 
-function pageResponse(page: BreakdownPage): BreakdownResponse {
-  return { ...page, ...responseContext() }
+function pageResponse(page: Omit<BreakdownPage, 'revision'> & { revision?: string }): BreakdownResponse {
+  return { revision: 'revision-1', ...page, ...responseContext() }
 }
 
 function filterResponse(values: Pick<ActivityFilterResponse, 'workspaces' | 'providers' | 'models'>): ActivityFilterResponse {
@@ -99,6 +99,8 @@ describe('activity report client', () => {
   it('switches to request trend and shows TTFT and tool-failure coverage', async () => {
     const data = summary(10)
     data.coverage.ttft = { samples: 1, total: 2 }
+    data.coverage.modelTiming = { samples: 2, total: 3 }
+    data.coverage.toolTiming = { samples: 2, total: 4 }
     data.totals.performance.messageSamples = 2
     data.totals.performance.ttftSamples = 1
     data.totals.activity.toolCalls = 2
@@ -119,10 +121,29 @@ describe('activity report client', () => {
 
     await screen.findByText('总处理 Token')
     expect(screen.getByText('TTFT 覆盖率').parentElement).toHaveTextContent('50.0%')
+    expect(screen.getByText('模型耗时覆盖率').parentElement).toHaveTextContent('66.7%')
+    expect(screen.getByText('工具耗时覆盖率').parentElement).toHaveTextContent('50.0%')
     fireEvent.click(screen.getByRole('button', { name: '请求' }))
     expect(screen.getByRole('graphics-symbol')).toHaveAccessibleName(/请求 1/)
     expect(screen.getByText('工具失败趋势')).toBeInTheDocument()
     expect(screen.getAllByText('1 / 2')).toHaveLength(2)
+  })
+
+  it('shows unavailable tool failure rates when no result was reported', async () => {
+    const data = summary(10)
+    data.series[0]!.metrics.activity.toolCalls = 1
+    const api: ActivityClient = {
+      summary: async () => data,
+      breakdown: async () => emptyPage,
+      filters: async () => filterResponse({ workspaces: [], providers: [], models: [] }),
+      retry: async () => data.status,
+      exportUrl: () => '#',
+    }
+
+    render(<ActivitySection api={api} openSession={vi.fn()} close={vi.fn()} t={t} />)
+
+    const trend = (await screen.findByText('工具失败趋势')).closest('section')!
+    expect(within(trend).getByText('未报告')).toBeInTheDocument()
   })
 
   it('shows request origins, row coverage, and outcomes in analysis tables', async () => {

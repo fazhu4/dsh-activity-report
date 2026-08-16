@@ -146,7 +146,6 @@ function replaceUsage(
   timeZone?: string,
 ): void {
   const key = stepKey(turn, step)
-  if (record.runtime.openUsage?.stepKey === key) applyUsage(record, record.runtime.openUsage, -1)
   const resolved = route ?? record.runtime.openStep?.route ?? record.runtime.currentRoute
     ?? { provider: UNKNOWN, model: UNKNOWN }
   const sample: UsageSample = {
@@ -157,7 +156,6 @@ function replaceUsage(
     origin,
     usage,
   }
-  applyUsage(record, sample, 1)
   record.runtime.openUsage = sample
 }
 
@@ -205,27 +203,33 @@ export function foldEvent(state: FoldState, event: SessionEvent, timeZone?: stri
       if (adapted.usage !== undefined) {
         replaceUsage(record, adapted.time, adapted.turn, adapted.step, adapted.usage, 'agent', adapted.route, timeZone)
       }
-      if (open?.turn === adapted.turn && open.step === adapted.step && open.messageRecorded !== true) {
-        addActivity(record, eventDay, adapted.route, (metrics) => {
-          metrics.performance.modelMs = Math.max(0, adapted.time - open.startTime)
-          metrics.performance.messageSamples = 1
-          if (open.firstTokenTime !== undefined) {
-            metrics.performance.ttftMs = Math.max(0, open.firstTokenTime - open.startTime)
-            metrics.performance.ttftSamples = 1
-            metrics.performance.decodeMs = Math.max(0, adapted.time - open.firstTokenTime)
-            metrics.performance.decodeTokens = adapted.usage?.output ?? 0
-          }
-        })
-        open.messageRecorded = true
+      if (open?.turn === adapted.turn && open.step === adapted.step && open.messageTime === undefined) {
+        open.messageTime = adapted.time
+        open.messageOutputTokens = adapted.usage?.output ?? 0
       }
       break
     }
     case 'step-end': {
-      const route = record.runtime.openStep?.route ?? record.runtime.currentRoute
+      const open = record.runtime.openStep
+      const route = open?.route ?? record.runtime.currentRoute
         ?? { provider: UNKNOWN, model: UNKNOWN }
+      const key = stepKey(adapted.turn, adapted.step)
+      if (record.runtime.openUsage?.stepKey === key) {
+        applyUsage(record, { ...record.runtime.openUsage, day: eventDay }, 1)
+      }
       addActivity(record, eventDay, route, (metrics) => {
         metrics.activity.steps = 1
         if (record.runtime.lastCountedTurn !== adapted.turn) metrics.activity.turns = 1
+        if (open?.turn === adapted.turn && open.step === adapted.step && open.messageTime !== undefined) {
+          metrics.performance.modelMs = Math.max(0, open.messageTime - open.startTime)
+          metrics.performance.messageSamples = 1
+          if (open.firstTokenTime !== undefined) {
+            metrics.performance.ttftMs = Math.max(0, open.firstTokenTime - open.startTime)
+            metrics.performance.ttftSamples = 1
+            metrics.performance.decodeMs = Math.max(0, open.messageTime - open.firstTokenTime)
+            metrics.performance.decodeTokens = open.messageOutputTokens ?? 0
+          }
+        }
       })
       record.runtime.lastCountedTurn = adapted.turn
       delete record.runtime.openStep
@@ -243,7 +247,7 @@ export function foldEvent(state: FoldState, event: SessionEvent, timeZone?: stri
       const seenToolCalls = record.runtime.seenToolCalls ??= {}
       if (seenToolCalls[adapted.callId] === true) break
       seenToolCalls[adapted.callId] = true
-      record.runtime.pendingTools[adapted.callId] = { name: adapted.name, startTime: adapted.time }
+      record.runtime.pendingTools[adapted.callId] = { name: adapted.name, startTime: adapted.time, day: eventDay }
       const metrics = emptyMetrics()
       metrics.activity.toolCalls = 1
       const day = dayAt(record, eventDay)
@@ -258,7 +262,7 @@ export function foldEvent(state: FoldState, event: SessionEvent, timeZone?: stri
       metrics.activity.toolResults = 1
       metrics.activity.toolErrors = adapted.failed ? 1 : 0
       metrics.performance.toolMs = Math.max(0, adapted.time - pending.startTime)
-      const day = dayAt(record, eventDay)
+      const day = dayAt(record, pending.day)
       addMetrics(day.totals, metrics)
       addMetrics(metricsAt(day.byTool, pending.name), metrics)
       delete record.runtime.pendingTools[adapted.callId]
