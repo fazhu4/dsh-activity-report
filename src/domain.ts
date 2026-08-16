@@ -54,6 +54,7 @@ const routeSchema = z.object({ provider: z.string(), model: z.string() }).strict
 
 const sessionRecordSchema = z.object({
   sessionId: z.string(),
+  timezone: z.string().optional(),
   watermark: z.number().int().min(-1),
   metadata: z.object({
     cwd: z.string().optional(),
@@ -94,9 +95,10 @@ export const activityReportDomainSpec = defineDomain({
 })
 
 /** Create an empty durable fold for one Session. */
-export function createSessionRecord(sessionId: SessionId, metadata: SessionMetadata = {}): SessionRecord {
+export function createSessionRecord(sessionId: SessionId, metadata: SessionMetadata = {}, timezone?: string): SessionRecord {
   return {
     sessionId,
+    ...(timezone === undefined ? {} : { timezone }),
     watermark: -1,
     metadata: { ...metadata },
     runtime: { lastCountedTurn: null, pendingTools: {} },

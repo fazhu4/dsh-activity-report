@@ -71,6 +71,8 @@ export interface SessionMetadata {
 /** One atomically persisted per-session fold. */
 export interface SessionRecord {
   sessionId: SessionId
+  /** IANA timezone used to assign this derived projection's day buckets. */
+  timezone?: string
   watermark: number
   metadata: SessionMetadata
   runtime: RuntimeFoldState

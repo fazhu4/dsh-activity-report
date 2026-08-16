@@ -18,6 +18,13 @@ function event(seq: number, type = 'compaction/summary'): SessionEvent {
   } as SessionEvent
 }
 
+function eventAt(seq: number, time: number): SessionEvent {
+  return {
+    ...event(seq),
+    time,
+  }
+}
+
 function header(id = SESSION_ID): SessionHeader {
   return { version: 0, id, createdAt: 1, cwd: 'G:/project' }
 }
@@ -65,6 +72,32 @@ function dependencies(domain: ActivityDomain, readSession: ActivityRuntimeDeps['
 }
 
 describe('activity host lifecycle', () => {
+  it('rebuilds a persisted projection when its timezone differs from configuration', async () => {
+    const persisted = createFoldState(SESSION_ID, { cwd: 'G:/project' })
+    const boundary = Date.UTC(2026, 7, 15, 18)
+    foldEvents(persisted, [eventAt(0, boundary)], 'UTC')
+    const domain = fakeDomain(persisted.record)
+    const runtime = new ActivityRuntime(dependencies(domain, async () => ({
+      session: header(),
+      events: [eventAt(0, boundary)],
+    })), {
+      persistDebounceMs: 0,
+      backfillConcurrency: 1,
+      timezone: 'Asia/Shanghai',
+    })
+
+    await runtime.start()
+
+    expect(runtime.records()[0]).toMatchObject({
+      timezone: 'Asia/Shanghai',
+      watermark: 0,
+      days: { '2026-08-16': { totals: { usage: { requests: 1 } } } },
+    })
+    expect(runtime.records()[0]?.days['2026-08-15']).toBeUndefined()
+    expect(domain.puts.at(-1)?.timezone).toBe('Asia/Shanghai')
+    await runtime.dispose()
+  })
+
   it('buffers live events until persisted backfill reaches the same session', async () => {
     const persisted = createFoldState(SESSION_ID, { cwd: 'G:/project' })
     foldEvents(persisted, [event(0, 'ignored'), event(1, 'ignored'), event(2, 'ignored')])

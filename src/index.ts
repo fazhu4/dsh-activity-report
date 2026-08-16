@@ -16,6 +16,7 @@ export interface Config {
   persistDebounceMs?: number
   backfillConcurrency?: number
   defaultPageSize?: number
+  timezone?: string
 }
 
 /** Fully resolved plugin configuration. */
@@ -23,14 +24,23 @@ export interface ResolvedConfig {
   persistDebounceMs: number
   backfillConcurrency: number
   defaultPageSize: number
+  timezone: string
 }
 
 /** Validate and resolve deployment choices at plugin load. */
 export function resolveConfig(config: Config = {}): ResolvedConfig {
+  const configuredTimezone = config.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+  let timezone: string
+  try {
+    timezone = new Intl.DateTimeFormat('en-US', { timeZone: configuredTimezone }).resolvedOptions().timeZone
+  } catch {
+    throw new Error('timezone must be a valid IANA time zone')
+  }
   const resolved = {
     persistDebounceMs: config.persistDebounceMs ?? 1_000,
     backfillConcurrency: config.backfillConcurrency ?? 4,
     defaultPageSize: config.defaultPageSize ?? 25,
+    timezone,
   }
   if (!Number.isSafeInteger(resolved.persistDebounceMs) || resolved.persistDebounceMs < 0) {
     throw new Error('persistDebounceMs must be a non-negative safe integer')
@@ -64,7 +74,7 @@ export async function apply(ctx: Context & { webServer: WebServerFace }, config:
     records: () => runtime.records(),
     status: () => runtime.status(),
     now: () => Date.now(),
-    timezone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: () => resolved.timezone,
   }, resolved)
   ctx.effect(() => async () => {
     offRoutes()

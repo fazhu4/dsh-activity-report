@@ -20,8 +20,8 @@ export interface FoldState {
 }
 
 /** Create an empty fold for one Session. */
-export function createFoldState(sessionId: SessionId, metadata: SessionMetadata = {}): FoldState {
-  return { record: createSessionRecord(sessionId, metadata) }
+export function createFoldState(sessionId: SessionId, metadata: SessionMetadata = {}, timezone?: string): FoldState {
+  return { record: createSessionRecord(sessionId, metadata, timezone) }
 }
 
 /** Resume a fold from a validated storage-domain record without mutating the caller's object. */

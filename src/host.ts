@@ -33,6 +33,7 @@ export interface ActivityRuntimeDeps {
 export interface ActivityRuntimeConfig {
   persistDebounceMs: number
   backfillConcurrency: number
+  timezone?: string
 }
 
 /** Observable ingestion and durability state returned by the summary API. */
@@ -67,11 +68,14 @@ export class ActivityRuntime {
   private totalSessions = 0
   private failedSessions = 0
   private lastPersistedAt?: number
+  private readonly timezone: string
 
   constructor(
     private readonly deps: ActivityRuntimeDeps,
     private readonly config: ActivityRuntimeConfig,
-  ) {}
+  ) {
+    this.timezone = config.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+  }
 
   /** Open storage, hydrate records, replay the logical corpus, and drain startup buffers. */
   start(): Promise<void> {
@@ -84,10 +88,16 @@ export class ActivityRuntime {
   private async startInternal(): Promise<void> {
     this.domain = await this.deps.storageDomain.open(activityReportDomainSpec)
     this.table = this.domain.table('sessions')
+    const incompatible = new Set<SessionId>()
     for (const [id, record] of this.table.entries()) {
+      if (record.timezone !== this.timezone) {
+        incompatible.add(id)
+        continue
+      }
       this.states.set(id, hydrateFoldState(record))
       this.revisions.set(id, 0)
     }
+    for (const id of incompatible) await this.table.delete(id)
 
     const sessions = await this.deps.sessionQuery.listSessions(this.abort.signal)
     for (const { header } of sessions) this.countedSessions.add(header.id)
@@ -211,7 +221,7 @@ export class ActivityRuntime {
       }
       const existing = this.states.get(header.id)
       if (existing === undefined) {
-        this.states.set(header.id, createFoldState(header.id, metadata(snapshot.session, title)))
+        this.states.set(header.id, createFoldState(header.id, metadata(snapshot.session, title), this.timezone))
         this.markDirty(header.id)
       } else {
         const nextMetadata = { ...existing.record.metadata, ...metadata(snapshot.session, title) }
@@ -250,7 +260,7 @@ export class ActivityRuntime {
   private mergeMetadata(id: SessionId, next: SessionRecord['metadata']): void {
     const state = this.states.get(id)
     if (state === undefined) {
-      this.states.set(id, createFoldState(id, next))
+      this.states.set(id, createFoldState(id, next, this.timezone))
       this.markDirty(id)
       return
     }
@@ -263,11 +273,11 @@ export class ActivityRuntime {
   private fold(id: SessionId, events: readonly SessionEvent[]): void {
     let state = this.states.get(id)
     if (state === undefined) {
-      state = createFoldState(id)
+      state = createFoldState(id, {}, this.timezone)
       this.states.set(id, state)
     }
     const before = state.record.watermark
-    foldEvents(state, events)
+    foldEvents(state, events, this.timezone)
     if (state.record.watermark !== before) this.markDirty(id)
   }
 
