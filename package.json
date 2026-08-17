@@ -1,8 +1,16 @@
 {
   "name": "dsh-usage-insights",
   "description": "Local, read-only usage and performance analytics for DeepSeek Harness sessions.",
-  "version": "0.2.0-alpha.0",
+  "version": "0.2.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/faz4hu/dsh-usage-insights.git"
+  },
+  "bugs": {
+    "url": "https://github.com/faz4hu/dsh-usage-insights/issues"
+  },
+  "homepage": "https://github.com/faz4hu/dsh-usage-insights#readme",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
