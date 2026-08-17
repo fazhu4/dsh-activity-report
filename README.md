@@ -31,7 +31,6 @@ dsh plugin --profile web add dsh-usage-insights@0.2.0-alpha.0
 ```
 
 > **v0.2.0 命名空间改版**：`dsh-activity-report` 已更名为 `dsh-usage-insights`（插件 ID、HTTP 路由、storage domain、CSS 前缀与本地化命名空间全部更新）。安装旧包的 profile 请先 `dsh plugin --profile web remove dsh-activity-report`，再安装新包并重启 `dsh web`；派生聚合会从会话事件自动重建。
-```
 
 添加后重启 `dsh web`，再打开“设置 > 工作活动”。host 插件需要重启加载，client bundle 随页面刷新加载。
 
