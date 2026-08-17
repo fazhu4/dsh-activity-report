@@ -252,29 +252,29 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
   const cacheReuse = promptTokens > 0 && totals !== undefined ? percent(totals.usage.cacheRead, promptTokens) : t('notReported')
   const errors = [...new Set([filterError, summaryError, breakdownError, paginationError, retryError].filter((value): value is string => value !== null))]
 
-  return <div className="dsh_activity_section">
-    <header className="dsh_activity_hero">
-      <div className="dsh_activity_heroCopy">
-        <span className="dsh_activity_eyebrow">{t('nav')}</span>
-        <h2 className="dsh_activity_title">{t('nav')}</h2>
+  return <div className="dsh_usage_section">
+    <header className="dsh_usage_hero">
+      <div className="dsh_usage_heroCopy">
+        <span className="dsh_usage_eyebrow">{t('nav')}</span>
+        <h2 className="dsh_usage_title">{t('nav')}</h2>
         <p>{t('subtitle')}</p>
       </div>
-      <div className="dsh_activity_privacy" role="note">
-        <span className="dsh_activity_privacyMark" aria-hidden="true" />
+      <div className="dsh_usage_privacy" role="note">
+        <span className="dsh_usage_privacyMark" aria-hidden="true" />
         <span>{t('privacy')}</span>
       </div>
     </header>
 
-    <div className="dsh_activity_toolbar">
-      <div className="dsh_activity_toolbarGroup dsh_activity_toolbarRange">
-        <span className="dsh_activity_toolbarLabel">{t('localDays')}</span>
-        <div className="dsh_activity_ranges" role="tablist" aria-label={t('localDays')}>
+    <div className="dsh_usage_toolbar">
+      <div className="dsh_usage_toolbarGroup dsh_usage_toolbarRange">
+        <span className="dsh_usage_toolbarLabel">{t('localDays')}</span>
+        <div className="dsh_usage_ranges" role="tablist" aria-label={t('localDays')}>
         {ranges.map((item) => <button
           key={item.id}
           type="button"
           role="tab"
-          id={`dsh_activity_range_tab_${item.id}`}
-          aria-controls="dsh_activity_range_panel"
+          id={`dsh_usage_range_tab_${item.id}`}
+          aria-controls="dsh_usage_range_panel"
           aria-selected={range === item.id}
           tabIndex={range === item.id ? 0 : -1}
           data-tab-value={item.id}
@@ -284,21 +284,21 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
           >{t(item.key)}</button>)}
         </div>
       </div>
-      <div className="dsh_activity_toolbarGroup dsh_activity_toolbarFilters">
+      <div className="dsh_usage_toolbarGroup dsh_usage_toolbarFilters">
         <FilterSelect value={workspace} onChange={setWorkspace} all={t('allWorkspaces')} values={options.workspaces} />
         <FilterSelect value={provider} onChange={setProvider} all={t('allProviders')} values={options.providers} disabled={dimension === 'tool'} />
         <FilterSelect value={model} onChange={setModel} all={t('allModels')} values={options.models} disabled={dimension === 'tool'} />
       </div>
-      <div className="dsh_activity_toolbarActions">
-        <button type="button" className="dsh_activity_button" onClick={retryAndRefresh}>{t('refresh')}</button>
-        <a className="dsh_activity_button dsh_activity_buttonPrimary" href={api.exportUrl(selectedBreakdown)} download>{t('export')}</a>
+      <div className="dsh_usage_toolbarActions">
+        <button type="button" className="dsh_usage_button" onClick={retryAndRefresh}>{t('refresh')}</button>
+        <a className="dsh_usage_button dsh_usage_buttonPrimary" href={api.exportUrl(selectedBreakdown)} download>{t('export')}</a>
       </div>
     </div>
 
-    <div role="tabpanel" id="dsh_activity_range_panel" aria-labelledby={`dsh_activity_range_tab_${range}`}>
-    {summary !== null && <div className={`dsh_activity_status is-${summary.status.phase}`}>
-      <div className="dsh_activity_statusMain"><span className="dsh_activity_statusMark" aria-hidden="true" /><strong>{statusLabel(summary, t)}</strong></div>
-      <div className="dsh_activity_statusMeta">
+    <div role="tabpanel" id="dsh_usage_range_panel" aria-labelledby={`dsh_usage_range_tab_${range}`}>
+    {summary !== null && <div className={`dsh_usage_status is-${summary.status.phase}`}>
+      <div className="dsh_usage_statusMain"><span className="dsh_usage_statusMark" aria-hidden="true" /><strong>{statusLabel(summary, t)}</strong></div>
+      <div className="dsh_usage_statusMeta">
         <span>{t('processed')}: {int(summary.status.processedSessions)} / {int(summary.status.totalSessions)}</span>
         {summary.status.failedSessions > 0 && <span>{t('failedSessions')}: {int(summary.status.failedSessions)}</span>}
         {summary.status.dirtyCount > 0 && <span>{t('dirtyRecords')}: {int(summary.status.dirtyCount)}</span>}
@@ -307,27 +307,27 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
       </div>
     </div>}
 
-    {errors.map((error) => <div key={error} className="dsh_activity_error" role="alert">{t('loadError')}: {error}</div>)}
-    {summary === null && loadingSummary ? <div className="dsh_activity_empty dsh_activity_emptyState">{t('loading')}</div> : totals !== undefined && <>
-      <div className="dsh_activity_overview">
-        <section className="dsh_activity_kpiFeatured">
-          <div className="dsh_activity_kpiFeaturedTop">
+    {errors.map((error) => <div key={error} className="dsh_usage_error" role="alert">{t('loadError')}: {error}</div>)}
+    {summary === null && loadingSummary ? <div className="dsh_usage_empty dsh_usage_emptyState">{t('loading')}</div> : totals !== undefined && <>
+      <div className="dsh_usage_overview">
+        <section className="dsh_usage_kpiFeatured">
+          <div className="dsh_usage_kpiFeaturedTop">
             <div>
-              <span className="dsh_activity_kpiLabel">{t('totalTokens')}</span>
+              <span className="dsh_usage_kpiLabel">{t('totalTokens')}</span>
               <strong>{compact(totalTokens(totals.usage))}</strong>
               <small>{int(totalTokens(totals.usage))}</small>
             </div>
-            <span className="dsh_activity_kpiBadge">{t('tokens')}</span>
+            <span className="dsh_usage_kpiBadge">{t('tokens')}</span>
           </div>
-          <div className="dsh_activity_tokenBreakdown">
+          <div className="dsh_usage_tokenBreakdown">
             <TokenMetric label={t('input')} value={totals.usage.input} tone="input" />
             <TokenMetric label={t('cacheRead')} value={totals.usage.cacheRead} tone="cacheRead" />
             <TokenMetric label={t('cacheWrite')} value={totals.usage.cacheWrite} tone="cacheWrite" />
             <TokenMetric label={t('output')} value={totals.usage.output} tone="output" />
           </div>
-          <p className="dsh_activity_kpiHint">{t('reasoningHint')} · {t('reasoning')}: {int(totals.usage.reasoning)}</p>
+          <p className="dsh_usage_kpiHint">{t('reasoningHint')} · {t('reasoning')}: {int(totals.usage.reasoning)}</p>
         </section>
-        <div className="dsh_activity_kpiGrid">
+        <div className="dsh_usage_kpiGrid">
           <MetricCard label={t('requests')} value={int(totals.usage.requests)} />
           <MetricCard label={t('activeWorkspaces')} value={int(summary?.activeWorkspaces ?? 0)} />
           <MetricCard label={t('activeSessions')} value={int(summary?.activeSessions ?? 0)} />
@@ -336,8 +336,8 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
         </div>
       </div>
 
-      <section className="dsh_activity_panel dsh_activity_trendPanel">
-        <div className="dsh_activity_panelHeading"><div><h3>{t('trend')}</h3><p>{t('reasoningHint')}</p></div><div className="dsh_activity_toggle">
+      <section className="dsh_usage_panel dsh_usage_trendPanel">
+        <div className="dsh_usage_panelHeading"><div><h3>{t('trend')}</h3><p>{t('reasoningHint')}</p></div><div className="dsh_usage_toggle">
           <button type="button" aria-pressed={trendMode === 'tokens'} className={trendMode === 'tokens' ? 'is-active' : ''} onClick={() => setTrendMode('tokens')}>{t('trendTokens')}</button>
           <button type="button" aria-pressed={trendMode === 'requests'} className={trendMode === 'requests' ? 'is-active' : ''} onClick={() => setTrendMode('requests')}>{t('trendRequests')}</button>
           {loadingSummary && <span>{t('loading')}</span>}
@@ -348,18 +348,18 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
         }} />
       </section>
 
-      <section className="dsh_activity_panel dsh_activity_metricPanel">
-        <div className="dsh_activity_analysisHeader">
+      <section className="dsh_usage_panel dsh_usage_metricPanel">
+        <div className="dsh_usage_analysisHeader">
           <div><h3>{t('analysis')}</h3><p>{t('analysisHint')}</p></div>
-          <span className="dsh_activity_analysisCount">{page?.rows.length ?? 0} {t('rows')}</span>
+          <span className="dsh_usage_analysisCount">{page?.rows.length ?? 0} {t('rows')}</span>
         </div>
-        <div className="dsh_activity_dimensionTabs" role="tablist" aria-label={t('analysis')}>
+        <div className="dsh_usage_dimensionTabs" role="tablist" aria-label={t('analysis')}>
           {dimensions.map((item) => <button
             key={item.id}
             type="button"
             role="tab"
-            id={`dsh_activity_dimension_tab_${item.id}`}
-            aria-controls="dsh_activity_dimension_panel"
+            id={`dsh_usage_dimension_tab_${item.id}`}
+            aria-controls="dsh_usage_dimension_panel"
             aria-selected={dimension === item.id}
             tabIndex={dimension === item.id ? 0 : -1}
             data-tab-value={item.id}
@@ -375,14 +375,14 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
             )}
           >{t(item.key)}</button>)}
         </div>
-        {routeFilterActive && <p className="dsh_activity_privacy">{t('toolFilterHint')}</p>}
-        <div role="tabpanel" id="dsh_activity_dimension_panel" aria-labelledby={`dsh_activity_dimension_tab_${dimension}`} aria-busy={loadingRows}>
-        <div className="dsh_activity_tableTools">
+        {routeFilterActive && <p className="dsh_usage_privacy">{t('toolFilterHint')}</p>}
+        <div role="tabpanel" id="dsh_usage_dimension_panel" aria-labelledby={`dsh_usage_dimension_tab_${dimension}`} aria-busy={loadingRows}>
+        <div className="dsh_usage_tableTools">
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('search')} aria-label={t('search')} />
           <select value={sort} onChange={(event) => setSort(event.target.value as BreakdownSort)} aria-label={t('sort')}>
             {sortOptions(dimension).map((value) => <option key={value} value={value}>{sortLabel(value, t)}</option>)}
           </select>
-          <button type="button" className="dsh_activity_button" onClick={() => setDirection((value) => value === 'desc' ? 'asc' : 'desc')}>
+          <button type="button" className="dsh_usage_button" onClick={() => setDirection((value) => value === 'desc' ? 'asc' : 'desc')}>
             {direction === 'desc' ? t('descending') : t('ascending')}
           </button>
         </div>
@@ -392,15 +392,15 @@ export function ActivitySection({ api, openSession, close, t }: ActivitySectionP
           openSession={(id) => { close(); openSession(id) }}
           t={t}
         />
-        {loadingRows && <div className="dsh_activity_loadingOverlay dsh_activity_loadingState"><span aria-hidden="true" />{t('loading')}</div>}
-        {!loadingRows && (page?.rows.length ?? 0) === 0 && <div className="dsh_activity_empty dsh_activity_emptyState">{t('noData')}</div>}
-        {page?.nextCursor !== undefined && <button type="button" className="dsh_activity_more" onClick={loadMore}>{t('loadMore')}</button>}
+        {loadingRows && <div className="dsh_usage_loadingOverlay dsh_usage_loadingState"><span aria-hidden="true" />{t('loading')}</div>}
+        {!loadingRows && (page?.rows.length ?? 0) === 0 && <div className="dsh_usage_empty dsh_usage_emptyState">{t('noData')}</div>}
+        {page?.nextCursor !== undefined && <button type="button" className="dsh_usage_more" onClick={loadMore}>{t('loadMore')}</button>}
         </div>
       </section>
 
       <Performance metrics={totals} coverage={summary!.coverage} t={t} />
       <ReliabilityTrend points={summary!.series} t={t} />
-      <details className="dsh_activity_notes"><summary>{t('metricNotes')}</summary><p>{t('metricNotesBody')}</p></details>
+      <details className="dsh_usage_notes"><summary>{t('metricNotes')}</summary><p>{t('metricNotesBody')}</p></details>
     </>}
     </div>
   </div>
@@ -414,11 +414,11 @@ function FilterSelect({ value, onChange, all, values, disabled = false }: { valu
 }
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail?: string }): JSX.Element {
-  return <div className="dsh_activity_card"><span>{label}</span><strong>{value}</strong>{detail !== undefined && <small>{detail}</small>}</div>
+  return <div className="dsh_usage_card"><span>{label}</span><strong>{value}</strong>{detail !== undefined && <small>{detail}</small>}</div>
 }
 
 function TokenMetric({ label, value, tone }: { label: string; value: number; tone: 'input' | 'cacheRead' | 'cacheWrite' | 'output' }): JSX.Element {
-  return <div className={`dsh_activity_tokenMetric is-${tone}`}>
+  return <div className={`dsh_usage_tokenMetric is-${tone}`}>
     <span><i aria-hidden="true" />{label}</span>
     <strong>{compact(value)}</strong>
   </div>
@@ -447,7 +447,7 @@ function BreakdownTable({ dimension, rows, openSession, t }: {
   if (rows.length === 0) return null
   const providerLike = dimension === 'provider' || dimension === 'model'
   const tool = dimension === 'tool'
-  return <div className="dsh_activity_tableWrap"><table className="dsh_activity_table">
+  return <div className="dsh_usage_tableWrap"><table className="dsh_usage_table">
     <thead><tr>
       <th>{t(dimension)}</th>
       {tool ? <>
@@ -460,7 +460,7 @@ function BreakdownTable({ dimension, rows, openSession, t }: {
     </tr></thead>
     <tbody>{rows.map((row) => <tr key={row.key}>
       <td>{dimension === 'session' && row.sessionId !== undefined
-        ? <button type="button" className="dsh_activity_sessionButton" onClick={() => openSession(row.sessionId!)}>{row.title ?? row.key}</button>
+        ? <button type="button" className="dsh_usage_sessionButton" onClick={() => openSession(row.sessionId!)}>{row.title ?? row.key}</button>
         : row.key}{row.cwd !== undefined && <small>{row.cwd}</small>}</td>
       {tool ? <ToolCells metrics={row.metrics} t={t} /> : <MetricCells row={row} providerLike={providerLike} t={t} />}
     </tr>)}</tbody>
@@ -500,8 +500,8 @@ function Performance({ metrics, coverage, t }: { metrics: Metrics; coverage: Act
   const modelTimingCoverage = coverage.modelTiming.total === 0 ? t('notReported') : percent(coverage.modelTiming.samples, coverage.modelTiming.total)
   const toolTimingCoverage = coverage.toolTiming.total === 0 ? t('notReported') : percent(coverage.toolTiming.samples, coverage.toolTiming.total)
   const speed = metrics.performance.decodeMs === 0 || metrics.performance.decodeTokens === 0 ? t('notReported') : `${(metrics.performance.decodeTokens / metrics.performance.decodeMs * 1_000).toFixed(1)} ${t('tokens')}/s`
-  return <section className="dsh_activity_panel dsh_activity_metricPanel"><div className="dsh_activity_analysisHeader"><div><h3>{t('performance')}</h3><p>{t('analysisHint')}</p></div></div>
-    <div className="dsh_activity_performance">
+  return <section className="dsh_usage_panel dsh_usage_metricPanel"><div className="dsh_usage_analysisHeader"><div><h3>{t('performance')}</h3><p>{t('analysisHint')}</p></div></div>
+    <div className="dsh_usage_performance">
       <MetricCard label={t('avgTtft')} value={ttft} />
       <MetricCard label={t('ttftCoverage')} value={ttftCoverage} detail={`${int(coverage.ttft.samples)} / ${int(coverage.ttft.total)}`} />
       <MetricCard label={t('modelTimingCoverage')} value={modelTimingCoverage} detail={`${int(coverage.modelTiming.samples)} / ${int(coverage.modelTiming.total)}`} />
@@ -510,16 +510,16 @@ function Performance({ metrics, coverage, t }: { metrics: Metrics; coverage: Act
       <MetricCard label={t('modelTime')} value={metrics.performance.messageSamples === 0 ? t('notReported') : duration(metrics.performance.modelMs)} />
       <MetricCard label={t('toolTime')} value={metrics.activity.toolResults === 0 ? t('notReported') : duration(metrics.performance.toolMs)} />
     </div>
-    {Object.keys(metrics.activity.outcomes).length > 0 && <div className="dsh_activity_outcomes"><strong>{t('outcomes')}</strong>{Object.entries(metrics.activity.outcomes).map(([key, value]) => <span key={key}>{key}: {int(value)}</span>)}</div>}
+    {Object.keys(metrics.activity.outcomes).length > 0 && <div className="dsh_usage_outcomes"><strong>{t('outcomes')}</strong>{Object.entries(metrics.activity.outcomes).map(([key, value]) => <span key={key}>{key}: {int(value)}</span>)}</div>}
   </section>
 }
 
 function ReliabilityTrend({ points, t }: { points: ActivitySummaryResponse['series']; t: ActivityT }): JSX.Element {
   const observed = points.filter((point) => point.metrics.activity.toolResults > 0 || point.metrics.activity.toolCalls > 0)
   if (observed.length === 0) return <></>
-  return <section className="dsh_activity_panel dsh_activity_metricPanel">
-    <div className="dsh_activity_panelHeading"><div><h3>{t('toolFailureTrend')}</h3><p>{t('toolFailureHint')}</p></div></div>
-    <div className="dsh_activity_reliability">{observed.map((point) => {
+  return <section className="dsh_usage_panel dsh_usage_metricPanel">
+    <div className="dsh_usage_panelHeading"><div><h3>{t('toolFailureTrend')}</h3><p>{t('toolFailureHint')}</p></div></div>
+    <div className="dsh_usage_reliability">{observed.map((point) => {
       const returned = point.metrics.activity.toolResults
       const errors = point.metrics.activity.toolErrors
       return <div key={point.day}>

@@ -273,7 +273,7 @@ function handler(
           const date = dayKey(source.now(), source.timezone())
           res.writeHead(200, {
             'Content-Type': 'text/csv; charset=utf-8',
-            'Content-Disposition': `attachment; filename="dsh-activity-${query.dimension}-${date}.csv"`,
+            'Content-Disposition': `attachment; filename="dsh-usage-insights-${query.dimension}-${date}.csv"`,
             'Cache-Control': 'no-store',
           })
           res.end(body)
@@ -298,11 +298,11 @@ export function registerActivityRoutes(
   config: ActivityHttpConfig,
 ): () => void {
   const registrations: Array<[WebRoute['path'], Parameters<typeof handler>[0]]> = [
-    ['/dsh-activity-report/summary', 'summary'],
-    ['/dsh-activity-report/breakdown', 'breakdown'],
-    ['/dsh-activity-report/filters', 'filters'],
-    ['/dsh-activity-report/export.csv', 'export'],
-    ['/dsh-activity-report/retry', 'retry'],
+    ['/dsh-usage-insights/summary', 'summary'],
+    ['/dsh-usage-insights/breakdown', 'breakdown'],
+    ['/dsh-usage-insights/filters', 'filters'],
+    ['/dsh-usage-insights/export.csv', 'export'],
+    ['/dsh-usage-insights/retry', 'retry'],
   ]
   const disposers = registrations.map(([path, endpoint]) => webServer.register({
     kind: 'exact',

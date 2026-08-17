@@ -53,14 +53,14 @@ function harness(model?: string, override: Partial<ActivityHttpSource> = {}) {
 
 describe('activity report HTTP API', () => {
   it.each([
-    '/dsh-activity-report/summary?range=year',
-    '/dsh-activity-report/breakdown?dimension=secret',
-    '/dsh-activity-report/breakdown?dimension=model&limit=0',
-    '/dsh-activity-report/breakdown?dimension=model&limit=9999',
-    '/dsh-activity-report/breakdown?dimension=model&cursor=bad',
-    '/dsh-activity-report/breakdown?dimension=tool&sort=requests',
-    '/dsh-activity-report/breakdown?dimension=tool&provider=deepseek',
-    '/dsh-activity-report/filters?range=year',
+    '/dsh-usage-insights/summary?range=year',
+    '/dsh-usage-insights/breakdown?dimension=secret',
+    '/dsh-usage-insights/breakdown?dimension=model&limit=0',
+    '/dsh-usage-insights/breakdown?dimension=model&limit=9999',
+    '/dsh-usage-insights/breakdown?dimension=model&cursor=bad',
+    '/dsh-usage-insights/breakdown?dimension=tool&sort=requests',
+    '/dsh-usage-insights/breakdown?dimension=tool&provider=deepseek',
+    '/dsh-usage-insights/filters?range=year',
   ])('rejects invalid query %s', async (path) => {
     const response = await harness().request(path)
     expect(response.status).toBe(400)
@@ -68,7 +68,7 @@ describe('activity report HTTP API', () => {
   })
 
   it('returns summary data with actual day bounds and persistence state', async () => {
-    const response = await harness().request('/dsh-activity-report/summary?range=today')
+    const response = await harness().request('/dsh-usage-insights/summary?range=today')
     expect(response.status).toBe(200)
     expect(response.json()).toMatchObject({
       timezone: 'Asia/Shanghai', startDay: '2026-08-16', endDayExclusive: '2026-08-17',
@@ -82,8 +82,8 @@ describe('activity report HTTP API', () => {
   })
 
   it.each([
-    '/dsh-activity-report/breakdown?range=today&dimension=model',
-    '/dsh-activity-report/filters?range=today',
+    '/dsh-usage-insights/breakdown?range=today&dimension=model',
+    '/dsh-usage-insights/filters?range=today',
   ])('returns common response context from %s', async (path) => {
     const response = await harness().request(path)
     expect(response.status).toBe(200)
@@ -97,10 +97,10 @@ describe('activity report HTTP API', () => {
   })
 
   it('exports the same filtered model rows as breakdown', async () => {
-    const response = await harness().request('/dsh-activity-report/export.csv?range=today&dimension=model')
+    const response = await harness().request('/dsh-usage-insights/export.csv?range=today&dimension=model')
     expect(response.status).toBe(200)
     expect(response.headers['Content-Type']).toContain('text/csv')
-    expect(response.headers['Content-Disposition']).toContain('dsh-activity-model-2026-08-16.csv')
+    expect(response.headers['Content-Disposition']).toContain('dsh-usage-insights-model-2026-08-16.csv')
     expect(response.body.split('\r\n')[0]).toBe('\uFEFFmodel,requests,agent_requests,compaction_requests,steps,message_samples,input,cache_read,cache_write,output,reasoning,total_tokens,model_ms,ttft_ms,ttft_samples,decode_ms,decode_tokens')
     expect(response.body).toContain('summary-model,1,0,1,0,0,20,0,0,5,0,25')
     expect(response.body).not.toContain('tool_calls')
@@ -108,12 +108,12 @@ describe('activity report HTTP API', () => {
   })
 
   it('exports only tool-attributable columns for the tool dimension', async () => {
-    const response = await harness().request('/dsh-activity-report/export.csv?range=today&dimension=tool')
+    const response = await harness().request('/dsh-usage-insights/export.csv?range=today&dimension=tool')
     expect(response.body).toBe('\uFEFFtool,tool_calls,tool_results,tool_errors,tool_ms\r\n')
   })
 
   it('uses a workspace-specific CSV schema without duplicate workspace columns', async () => {
-    const response = await harness().request('/dsh-activity-report/export.csv?range=today&dimension=workspace')
+    const response = await harness().request('/dsh-usage-insights/export.csv?range=today&dimension=workspace')
     const header = response.body.split('\r\n')[0]?.replace(/^\uFEFF/, '')
 
     expect(header?.split(',').filter((column) => column === 'workspace')).toHaveLength(1)
@@ -126,7 +126,7 @@ describe('activity report HTTP API', () => {
     const response = await harness(undefined, {
       records: () => { throw new Error('secret storage path') },
       onError,
-    }).request('/dsh-activity-report/summary?range=today')
+    }).request('/dsh-usage-insights/summary?range=today')
 
     expect(response.status).toBe(500)
     expect(response.json()).toEqual({ error: 'internal server error' })
@@ -139,7 +139,7 @@ describe('activity report HTTP API', () => {
     const response = await harness(undefined, {
       status: () => ({ phase: 'invalid' } as never),
       onError,
-    }).request('/dsh-activity-report/summary?range=today')
+    }).request('/dsh-usage-insights/summary?range=today')
 
     expect(response.status).toBe(500)
     expect(response.json()).toEqual({ error: 'internal server error' })
@@ -147,7 +147,7 @@ describe('activity report HTTP API', () => {
   })
 
   it('neutralizes whitespace-prefixed spreadsheet formulas', async () => {
-    const response = await harness(' \t=2+2').request('/dsh-activity-report/export.csv?range=today&dimension=model')
+    const response = await harness(' \t=2+2').request('/dsh-usage-insights/export.csv?range=today&dimension=model')
     expect(response.body).toContain("' \t=2+2")
   })
 
@@ -155,12 +155,12 @@ describe('activity report HTTP API', () => {
     const retryPersistence = vi.fn(async () => {})
     const api = harness(undefined, { retryPersistence })
 
-    const response = await api.request('/dsh-activity-report/retry', 'POST')
+    const response = await api.request('/dsh-usage-insights/retry', 'POST')
 
     expect(response.status).toBe(200)
     expect(response.json()).toMatchObject({ status: { phase: 'ready', dirtyCount: 0 } })
     expect(retryPersistence).toHaveBeenCalledOnce()
-    expect((await api.request('/dsh-activity-report/retry')).status).toBe(405)
+    expect((await api.request('/dsh-usage-insights/retry')).status).toBe(405)
   })
 
   it('registers and disposes all five exact routes', () => {

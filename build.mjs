@@ -40,7 +40,7 @@ await build({
   jsxDev: false,
   external: ['react', 'react-dom'],
   banner: {
-    js: 'window.__ModuleLoader__.load({ id: "dsh-activity-report", factory: (require) => {\n'
+    js: 'window.__ModuleLoader__.load({ id: "dsh-usage-insights", factory: (require) => {\n'
       + 'var module = { exports: {} }; var exports = module.exports;',
   },
   footer: { js: 'return module.exports; } });' },
@@ -55,5 +55,5 @@ execFileSync(process.execPath, [tsc, '-p', join(root, 'tsconfig.build.json')], {
 
 writeFileSync(
   join(output, 'manifest.json'),
-  `${JSON.stringify({ name: 'dsh-activity-report', host: 'lib/index.js', client: 'lib/client.js' }, null, 2)}\n`,
+  `${JSON.stringify({ name: 'dsh-usage-insights', host: 'lib/index.js', client: 'lib/client.js' }, null, 2)}\n`,
 )

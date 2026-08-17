@@ -91,7 +91,7 @@ const sessionRecordSchema = z.object({
 
 /** Versioned storage-domain declaration for activity folds. */
 export const activityReportDomainSpec = defineDomain({
-  name: 'activity_report',
+  name: 'usage_insights',
   version: 0,
   tables: {
     sessions: domainTable<SessionId, SessionRecord>(sessionRecordSchema),

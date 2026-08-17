@@ -1,7 +1,7 @@
 {
-  "name": "dsh-activity-report",
-  "description": "Local, read-only usage, activity, and performance analytics for DeepSeek Harness sessions.",
-  "version": "0.1.0-alpha.0",
+  "name": "dsh-usage-insights",
+  "description": "Local, read-only usage and performance analytics for DeepSeek Harness sessions.",
+  "version": "0.2.0-alpha.0",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -15,6 +15,7 @@
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",
+    "usage-insights",
     "usage-analytics",
     "token-usage",
     "local-first"

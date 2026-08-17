@@ -1,4 +1,4 @@
-# dsh-activity-report
+# dsh-usage-insights
 
 DeepSeek Harness 的本地只读用量面板。它从 DSH 会话事件中统计 Token、请求、Agent 活动、工具调用和性能，在“设置 > 工作活动”中提供可核对的卡片、趋势和分页明细。
 
@@ -27,7 +27,10 @@ DeepSeek Harness 的本地只读用量面板。它从 DSH 会话事件中统计 
 ## 安装
 
 ```powershell
-dsh plugin --profile web add dsh-activity-report@0.1.0-alpha.0
+dsh plugin --profile web add dsh-usage-insights@0.2.0-alpha.0
+```
+
+> **v0.2.0 命名空间改版**：`dsh-activity-report` 已更名为 `dsh-usage-insights`（插件 ID、HTTP 路由、storage domain、CSS 前缀与本地化命名空间全部更新）。安装旧包的 profile 请先 `dsh plugin --profile web remove dsh-activity-report`，再安装新包并重启 `dsh web`；派生聚合会从会话事件自动重建。
 ```
 
 添加后重启 `dsh web`，再打开“设置 > 工作活动”。host 插件需要重启加载，client bundle 随页面刷新加载。
@@ -64,7 +67,7 @@ dsh plugin --profile web add dsh-activity-report@0.1.0-alpha.0
 
 ## 本地存储与隐私
 
-插件只读取 DSH 已有的本地会话语料，并通过 DSH `storageDomain` 的 `activity_report` domain 固化每会话聚合记录。实际介质由 DSH profile 的 storage backend 决定。界面和导出不包含提示词、回复正文、工具参数或工具输出。
+插件只读取 DSH 已有的本地会话语料，并通过 DSH `storageDomain` 的 `usage_insights` domain 固化每会话聚合记录。实际介质由 DSH profile 的 storage backend 决定。界面和导出不包含提示词、回复正文、工具参数或工具输出。
 
 当源会话从 DSH 逻辑语料中移除时，插件只清理自己对应的派生聚合记录，不修改或删除 DSH 会话数据。
 
@@ -83,11 +86,11 @@ dsh plugin --profile web add dsh-activity-report@0.1.0-alpha.0
 
 | 路由 | 说明 |
 |---|---|
-| `GET /dsh-activity-report/summary` | 卡片、日期趋势、服务商/模型/来源汇总和数据状态 |
-| `GET /dsh-activity-report/breakdown` | 指定维度、排序、方向、搜索、limit 和 cursor 的一页明细；实时投影变化会使旧 cursor 失效 |
-| `GET /dsh-activity-report/filters` | 当前范围及筛选条件下可用的工作区、服务商和模型 |
-| `GET /dsh-activity-report/export.csv` | 当前筛选和维度的完整 CSV |
-| `POST /dsh-activity-report/retry` | 重试尚未固化的派生记录并返回最新状态 |
+| `GET /dsh-usage-insights/summary` | 卡片、日期趋势、服务商/模型/来源汇总和数据状态 |
+| `GET /dsh-usage-insights/breakdown` | 指定维度、排序、方向、搜索、limit 和 cursor 的一页明细；实时投影变化会使旧 cursor 失效 |
+| `GET /dsh-usage-insights/filters` | 当前范围及筛选条件下可用的工作区、服务商和模型 |
+| `GET /dsh-usage-insights/export.csv` | 当前筛选和维度的完整 CSV |
+| `POST /dsh-usage-insights/retry` | 重试尚未固化的派生记录并返回最新状态 |
 
 三个 JSON 读取接口都返回 `timezone`、`startDay`、`endDayExclusive`、`status` 和样本覆盖率。所有读取接口接受 `range=today|7d|30d|all`，以及可重复的 `workspace`、`provider` 和 `model` 参数。工具维度不接受 `provider` 或 `model`。无效筛选组合、枚举、排序、游标或页大小返回 HTTP 400；意外的内部异常返回不泄漏细节的 HTTP 500。
 

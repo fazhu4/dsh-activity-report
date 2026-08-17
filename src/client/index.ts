@@ -16,13 +16,13 @@ export const inject = ['slots', 'locale', 'sessions']
 
 /** Register the local activity settings section. */
 export function apply(ctx: ActivityClientContext): void {
-  ctx.effect(() => adoptStyles(), 'dsh-activity-report: styles')
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-activity-report: dictionaries')
+  ctx.effect(() => adoptStyles(), 'dsh-usage-insights: styles')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-usage-insights: dictionaries')
   const t = ctx.locale.bind(NS)
   const api = createActivityClient()
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
-    id: 'activity-report',
+    id: 'usage-insights',
     order: 90,
     label: () => t('nav'),
     locale: NS,

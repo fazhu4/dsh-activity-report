@@ -1,10 +1,10 @@
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    'dsh-activity-report': keyof typeof zh
+    'dsh-usage-insights': keyof typeof zh
   }
 }
 
-export const NS = 'dsh-activity-report'
+export const NS = 'dsh-usage-insights'
 
 export interface LocaleDict {
   nav: string; subtitle: string; privacy: string

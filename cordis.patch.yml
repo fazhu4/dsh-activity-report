@@ -1,8 +1,8 @@
-# dsh-activity-report bundle patch layer — installed automatically when this
-# package is added as a bundle (dsh plugin --profile web add dsh-activity-report).
+# dsh-usage-insights bundle patch layer — installed automatically when this
+# package is added as a bundle (dsh plugin --profile web add dsh-usage-insights).
 - insert:
-    - id: dsh-activity-report
-      name: 'dsh-activity-report'
+    - id: dsh-usage-insights
+      name: 'dsh-usage-insights'
       inject: ['webServer', 'sessionQuery', 'sessions', 'storageDomain']
       config:
         persistDebounceMs: 1000

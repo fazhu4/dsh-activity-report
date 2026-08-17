@@ -43,15 +43,15 @@ export function UsageChart({ points, labels, mode }: UsageChartProps): JSX.Eleme
   const selected = active === null ? undefined : points[active]
 
   return (
-    <div className="dsh_activity_chartFrame">
-      <div className="dsh_activity_chartScroller">
+    <div className="dsh_usage_chartFrame">
+      <div className="dsh_usage_chartScroller">
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={labels.chart}>
           {Array.from({ length: ticks + 1 }, (_, index) => {
             const value = maximum * index / ticks
             const y = PAD.top + innerHeight - innerHeight * index / ticks
             return <g key={index}>
-              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y} y2={y} className="dsh_activity_grid" />
-              <text x={PAD.left - 8} y={y + 4} textAnchor="end" className="dsh_activity_axis">{compact(value)}</text>
+              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y} y2={y} className="dsh_usage_grid" />
+              <text x={PAD.left - 8} y={y + 4} textAnchor="end" className="dsh_usage_axis">{compact(value)}</text>
             </g>
           })}
           {points.map((point, index) => {
@@ -83,7 +83,7 @@ export function UsageChart({ points, labels, mode }: UsageChartProps): JSX.Eleme
                 offset += height
                 return <rect
                   key={key}
-                  className={`dsh_activity_chartBar dsh_activity_chartBar_${key}`}
+                  className={`dsh_usage_chartBar dsh_usage_chartBar_${key}`}
                   x={x}
                   y={y}
                   width={barWidth}
@@ -97,13 +97,13 @@ export function UsageChart({ points, labels, mode }: UsageChartProps): JSX.Eleme
                 x={x + barWidth / 2}
                 y={HEIGHT - 12}
                 textAnchor="middle"
-                className="dsh_activity_axis"
+                className="dsh_usage_axis"
               >{point.day.slice(5)}</text>}
             </g>
           })}
         </svg>
       </div>
-      {selected !== undefined && <div className="dsh_activity_tooltip" role="status">
+      {selected !== undefined && <div className="dsh_usage_tooltip" role="status">
         <strong>{selected.day}</strong>
         {mode === 'requests'
           ? <span>{labels.requests}: {int(selected.metrics.usage.requests)}</span>
@@ -115,7 +115,7 @@ export function UsageChart({ points, labels, mode }: UsageChartProps): JSX.Eleme
               <span>{labels.reasoning}: {int(selected.metrics.usage.reasoning)}</span>
             </>}
       </div>}
-      <div className="dsh_activity_legend" aria-label={mode === 'requests' ? labels.requests : labels.tokens}>
+      <div className="dsh_usage_legend" aria-label={mode === 'requests' ? labels.requests : labels.tokens}>
         {(mode === 'requests'
           ? [['requests', labels.requests]] as const
           : [['input', labels.input], ['cacheRead', labels.cacheRead], ['cacheWrite', labels.cacheWrite], ['output', labels.output]] as const

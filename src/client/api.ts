@@ -138,21 +138,21 @@ async function json(response: Response): Promise<unknown> {
 export function createActivityClient(fetcher: typeof globalThis.fetch = globalThis.fetch): ActivityClient {
   return {
     summary: async (query, signal) => summarySchema.parse(await json(await fetcher(
-      `/dsh-activity-report/summary?${params(query)}`,
+      `/dsh-usage-insights/summary?${params(query)}`,
       { signal },
     ))) as ActivitySummaryResponse,
     breakdown: async (query, signal) => breakdownSchema.parse(await json(await fetcher(
-      `/dsh-activity-report/breakdown?${params(query)}`,
+      `/dsh-usage-insights/breakdown?${params(query)}`,
       { signal },
     ))) as BreakdownResponse,
     filters: async (query, signal) => filtersSchema.parse(await json(await fetcher(
-      `/dsh-activity-report/filters?${params(query)}`,
+      `/dsh-usage-insights/filters?${params(query)}`,
       { signal },
     ))) as ActivityFilterResponse,
     retry: async (signal) => {
-      const response = retrySchema.parse(await json(await fetcher('/dsh-activity-report/retry', { method: 'POST', signal })))
+      const response = retrySchema.parse(await json(await fetcher('/dsh-usage-insights/retry', { method: 'POST', signal })))
       return response.status as ActivityDataStatus
     },
-    exportUrl: (query) => `/dsh-activity-report/export.csv?${params(query)}`,
+    exportUrl: (query) => `/dsh-usage-insights/export.csv?${params(query)}`,
   }
 }

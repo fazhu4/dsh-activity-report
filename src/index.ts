@@ -6,7 +6,7 @@ import { registerActivityRoutes } from './http.ts'
 import type { WebServerFace } from './http.ts'
 
 /** Cordis plugin name. */
-export const name = 'dsh-activity-report'
+export const name = 'dsh-usage-insights'
 
 /** Services required for ingestion, persistence, queries, and the browser API. */
 export const inject = ['webServer', 'sessionQuery', 'sessions', 'storageDomain']
@@ -62,7 +62,7 @@ export async function apply(ctx: Context & { webServer: WebServerFace }, config:
     sessionQuery: ctx.sessionQuery,
     onError: (error, sessionId) => {
       const target = sessionId === undefined ? '' : ` for session '${sessionId}'`
-      ctx.logger.warn(`dsh-activity-report${target}: ${String(error)}`)
+      ctx.logger.warn(`dsh-usage-insights${target}: ${String(error)}`)
     },
   }, resolved)
 
@@ -76,14 +76,14 @@ export async function apply(ctx: Context & { webServer: WebServerFace }, config:
     now: () => Date.now(),
     timezone: () => resolved.timezone,
     retryPersistence: () => runtime.retryPersistence(),
-    onError: (error) => { ctx.logger.warn(`dsh-activity-report HTTP: ${String(error)}`) },
+    onError: (error) => { ctx.logger.warn(`dsh-usage-insights HTTP: ${String(error)}`) },
   }, resolved)
   ctx.effect(() => async () => {
     offRoutes()
     offEvent()
     offFlush()
     await runtime.dispose()
-  }, 'dsh-activity-report:runtime')
+  }, 'dsh-usage-insights:runtime')
 
   await runtime.start()
 }
