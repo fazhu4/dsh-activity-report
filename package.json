@@ -5,12 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/faz4hu/dsh-usage-insights.git"
+    "url": "git+https://github.com/fazhu4/dsh-usage-insights.git"
   },
   "bugs": {
-    "url": "https://github.com/faz4hu/dsh-usage-insights/issues"
+    "url": "https://github.com/fazhu4/dsh-usage-insights/issues"
   },
-  "homepage": "https://github.com/faz4hu/dsh-usage-insights#readme",
+  "homepage": "https://github.com/fazhu4/dsh-usage-insights#readme",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -57,7 +57,9 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "0648acc393c41f8a8f3b627b7437928b.png",
+    "f262ea81574ce6afaed345190e17c0f7.png"
   ],
   "scripts": {
     "build": "node build.mjs",

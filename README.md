@@ -6,9 +6,9 @@ DeepSeek Harness 的本地只读用量面板。它从 DSH 会话事件中统计 
 
 ## 界面预览
 
-![工作活动统计面板概览](https://raw.githubusercontent.com/faz4hu/dsh-usage-insights/main/0648acc393c41f8a8f3b627b7437928b.png)
+![工作活动统计面板概览](0648acc393c41f8a8f3b627b7437928b.png)
 
-![工作活动统计面板明细](https://raw.githubusercontent.com/faz4hu/dsh-usage-insights/main/f262ea81574ce6afaed345190e17c0f7.png)
+![工作活动统计面板明细](f262ea81574ce6afaed345190e17c0f7.png)
 
 ## 功能
 
